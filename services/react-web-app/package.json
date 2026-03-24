@@ -38,6 +38,9 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@react-router/node": "^7.7.1",
     "@react-router/serve": "^7.7.1",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
+    "@types/three": "^0.183.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -56,6 +59,7 @@
     "recharts": "^2.15.4",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
+    "three": "^0.183.2",
     "vaul": "^1.1.2",
     "zod": "^4.1.9"
   },

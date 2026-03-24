@@ -1,61 +1,69 @@
 import type { Route } from "./+types/home";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { useState, useEffect } from "react";
+import ControlPanel from "~/components/bearing/ControlPanel";
 import { Badge } from "~/components/ui/badge";
+import BearingScene from "~/components/bearing/BearingScene";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "React Router + Bun Template" },
-    { name: "description", content: "A modern React app template with React Router, Bun, and shadcn/ui" },
+    { title: "Bearing Spin Lab — 6205" },
+    { name: "description", content: "Interactive 3D visualization of a 6205 ball bearing" },
   ];
 }
 
 export default function Home() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
-      <Card className="max-w-2xl w-full">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold mb-2">
-            React Router + Bun Template
-          </CardTitle>
-          <CardDescription className="text-lg">
-            A modern, production-ready template for building React applications
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="text-center space-y-4">
-            <p className="text-gray-600 dark:text-gray-400">
-              This template includes everything you need to start building:
-            </p>
-            <div className="flex flex-wrap gap-2 justify-center">
-              <Badge variant="secondary">React 19</Badge>
-              <Badge variant="secondary">React Router 7</Badge>
-              <Badge variant="secondary">Bun Runtime</Badge>
-              <Badge variant="secondary">shadcn/ui Components</Badge>
-              <Badge variant="secondary">Tailwind CSS</Badge>
-              <Badge variant="secondary">TypeScript</Badge>
-              <Badge variant="secondary">Polytope Containerization</Badge>
-            </div>
-          </div>
-          
-          <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
-            <h3 className="font-semibold mb-2 text-gray-900 dark:text-white">
-              Adding Dependencies
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-              Use the polytope module to add new packages:
-            </p>
-            <code className="text-sm bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-gray-800 dark:text-gray-200">
-              polytope run {`react-web-app`}-add --packages "package-name"
-            </code>
-          </div>
+  const [rpm, setRpm] = useState(0.1);
+  const [direction, setDirection] = useState<"cw" | "ccw">("cw");
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isClient, setIsClient] = useState(false);
 
-          <div className="text-center">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Start building your application by editing the routes in the <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">app/</code> directory.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  const handleReset = () => {
+    setIsPlaying(true);
+    setRpm(0.1);
+    setDirection("cw");
+  };
+
+  return (
+    <div className="h-screen flex flex-col bg-background text-foreground">
+      {/* Header */}
+      <header className="flex items-center justify-between px-6 py-3 border-b shrink-0">
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-semibold tracking-tight">Bearing Spin Lab</h1>
+          <Badge variant="outline" className="font-mono">6205</Badge>
+        </div>
+        <span className="text-sm text-muted-foreground font-mono">25 × 52 × 15 mm</span>
+      </header>
+
+      {/* Main */}
+      <div className="flex-1 flex min-h-0">
+        {/* 3D viewport */}
+        <div className="flex-1 bg-[#12121f]">
+          {isClient ? (
+            <BearingScene rpm={rpm} direction={direction} isPlaying={isPlaying} />
+          ) : (
+            <div className="h-full flex items-center justify-center text-muted-foreground">
+              Loading 3D scene…
+            </div>
+          )}
+        </div>
+
+        {/* Sidebar controls */}
+        <div className="p-4 border-l shrink-0 overflow-y-auto">
+          <ControlPanel
+            rpm={rpm}
+            setRpm={setRpm}
+            direction={direction}
+            setDirection={setDirection}
+            isPlaying={isPlaying}
+            setIsPlaying={setIsPlaying}
+            onReset={handleReset}
+          />
+        </div>
+      </div>
     </div>
   );
 }
