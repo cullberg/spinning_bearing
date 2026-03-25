@@ -576,8 +576,9 @@ const BPFI_MULT = BALL_COUNT / 2 * (1 + BD_PD);
 const BSF_MULT = PITCH_DIAMETER / (2 * BALL_DIAMETER) * (1 - BD_PD ** 2);
 const FTF_MULT = 0.5 * (1 - BD_PD);
 const W = 700;
-const H_WAVE = 240;
-const H_FFT = 280;
+const H_WAVE = 200;
+const H_FFT = 220;
+const H_TREND = 160;
 const MARGIN = { left: 40, right: 14, top: 10, bottom: 20 };
 const PLOT_W = W - MARGIN.left - MARGIN.right;
 function VibrationChart({ rpm, isPlaying, loadForce, greaseLevel, damage }) {
@@ -585,6 +586,9 @@ function VibrationChart({ rpm, isPlaying, loadForce, greaseLevel, damage }) {
   const timeRef = useRef(0);
   const lastTsRef = useRef(0);
   const [tick, setTick] = useState(0);
+  const TREND_MAX_POINTS = 120;
+  const trendRef = useRef([]);
+  const trendTimeRef = useRef(0);
   useEffect(() => {
     let frameId;
     const loop = (ts) => {
@@ -593,13 +597,35 @@ function VibrationChart({ rpm, isPlaying, loadForce, greaseLevel, damage }) {
       lastTsRef.current = ts;
       if (isPlaying && rpm > 0) {
         timeRef.current += dt;
+        trendTimeRef.current += dt;
+        if (trendTimeRef.current >= 3) {
+          trendTimeRef.current = 0;
+          const tau = Math.PI * 2;
+          const sf = rpm / 60;
+          const t = timeRef.current;
+          let e = 0;
+          e += Math.abs(Math.sin(tau * sf * t)) * 0.3;
+          e += Math.abs(Math.sin(tau * sf * BPFO_MULT * t)) * 0.6;
+          e += Math.abs(Math.sin(tau * sf * BPFI_MULT * t)) * 0.4;
+          e += Math.abs(Math.sin(tau * sf * BSF_MULT * t)) * 0.3;
+          const frictionMult = greaseLevel < 0.3 ? 1 + (1 - greaseLevel / 0.3) * 0.6 : 1;
+          e *= frictionMult * (0.5 + loadForce * 0.3);
+          if (damage === "outer-spall") e *= 2.5;
+          else if (damage === "inner-spall") e *= 2.2;
+          else if (damage === "ball-defect") e *= 2;
+          e += (Math.random() - 0.5) * 0.05;
+          e = Math.max(0, e);
+          const arr = trendRef.current;
+          arr.push({ t: timeRef.current, energy: e });
+          if (arr.length > TREND_MAX_POINTS) arr.shift();
+        }
       }
       setTick((t) => t + 1);
       frameId = requestAnimationFrame(loop);
     };
     frameId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frameId);
-  }, [isPlaying, rpm]);
+  }, [isPlaying, rpm, greaseLevel, loadForce, damage]);
   const amps = useMemo(() => {
     const base = Math.min(loadForce * 0.6, 1);
     let bpfoAmp = base * 0.9 + 0.1;
@@ -727,6 +753,23 @@ function VibrationChart({ rpm, isPlaying, loadForce, greaseLevel, damage }) {
   }, [fftData.maxFreq]);
   const plotHWave = H_WAVE - MARGIN.top - MARGIN.bottom;
   const plotHFft = H_FFT - MARGIN.top - MARGIN.bottom;
+  const plotHTrend = H_TREND - MARGIN.top - MARGIN.bottom;
+  const trendData = trendRef.current;
+  const trendPath = useMemo(() => {
+    if (trendData.length < 2) return "";
+    const pts = [];
+    const maxE = Math.max(1, ...trendData.map((d) => d.energy));
+    for (let i = 0; i < trendData.length; i++) {
+      const px = MARGIN.left + i / (TREND_MAX_POINTS - 1) * PLOT_W;
+      const py = MARGIN.top + plotHTrend - trendData[i].energy / maxE * plotHTrend * 0.9;
+      pts.push(`${i === 0 ? "M" : "L"}${px.toFixed(1)},${py.toFixed(1)}`);
+    }
+    return pts.join(" ");
+  }, [trendData.length, tick, plotHTrend]);
+  useMemo(() => {
+    if (trendData.length < 2) return 0;
+    return Math.max(1, ...trendData.map((d) => d.energy)) * 0.75;
+  }, [trendData.length, tick]);
   return /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-1.5 w-full select-none", children: [
     /* @__PURE__ */ jsxs("div", { children: [
       /* @__PURE__ */ jsx("div", { className: "text-[9px] font-mono text-gray-500 uppercase tracking-wider mb-0.5 px-0.5", children: "Vibration Signal" }),
@@ -765,6 +808,39 @@ function VibrationChart({ rpm, isPlaying, loadForce, greaseLevel, damage }) {
           ] }, i);
         }),
         rpm <= 0 && /* @__PURE__ */ jsx("text", { x: W / 2, y: H_FFT / 2, fill: "#4b5563", fontSize: "10", textAnchor: "middle", fontFamily: "monospace", children: "No signal" })
+      ] }) })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { children: [
+      /* @__PURE__ */ jsx("div", { className: "text-[9px] font-mono text-gray-500 uppercase tracking-wider mb-0.5 px-0.5", children: "Impact Energy Trend" }),
+      /* @__PURE__ */ jsx("div", { className: "bg-[#0c0f1a] rounded border border-gray-800/60 overflow-hidden", children: /* @__PURE__ */ jsxs("svg", { viewBox: `0 0 ${W} ${H_TREND}`, className: "w-full", preserveAspectRatio: "xMidYMid meet", children: [
+        /* @__PURE__ */ jsx("line", { x1: MARGIN.left, y1: MARGIN.top + plotHTrend, x2: W - MARGIN.right, y2: MARGIN.top + plotHTrend, stroke: "#1e2940", strokeWidth: "0.5" }),
+        /* @__PURE__ */ jsx("line", { x1: MARGIN.left, y1: MARGIN.top, x2: MARGIN.left, y2: MARGIN.top + plotHTrend, stroke: "#1e2940", strokeWidth: "0.5" }),
+        [0.25, 0.5, 0.75].map((f) => /* @__PURE__ */ jsx("line", { x1: MARGIN.left, y1: MARGIN.top + plotHTrend * (1 - f), x2: W - MARGIN.right, y2: MARGIN.top + plotHTrend * (1 - f), stroke: "#1a2235", strokeWidth: "0.3" }, f)),
+        /* @__PURE__ */ jsx("text", { x: 4, y: MARGIN.top + plotHTrend / 2, fill: "#6b7280", fontSize: "8", dominantBaseline: "middle", fontFamily: "monospace", children: "kE" }),
+        /* @__PURE__ */ jsx("text", { x: W - MARGIN.right, y: H_TREND - 3, fill: "#6b7280", fontSize: "7", textAnchor: "end", fontFamily: "monospace", children: "Time (30s window)" }),
+        trendData.length >= 2 && /* @__PURE__ */ jsxs(Fragment, { children: [
+          /* @__PURE__ */ jsx("line", { x1: MARGIN.left, y1: MARGIN.top + plotHTrend * 0.25, x2: W - MARGIN.right, y2: MARGIN.top + plotHTrend * 0.25, stroke: "#ef4444", strokeWidth: "0.5", strokeDasharray: "4 3", opacity: "0.5" }),
+          /* @__PURE__ */ jsx("text", { x: W - MARGIN.right - 2, y: MARGIN.top + plotHTrend * 0.25 - 3, fill: "#ef4444", fontSize: "6", textAnchor: "end", fontFamily: "monospace", opacity: "0.7", children: "ALARM" })
+        ] }),
+        trendPath && /* @__PURE__ */ jsxs(Fragment, { children: [
+          /* @__PURE__ */ jsx("path", { d: `${trendPath} L${MARGIN.left + (trendData.length - 1) / (TREND_MAX_POINTS - 1) * PLOT_W},${MARGIN.top + plotHTrend} L${MARGIN.left},${MARGIN.top + plotHTrend} Z`, fill: "url(#trendGrad)", opacity: "0.3" }),
+          /* @__PURE__ */ jsx("path", { d: trendPath, fill: "none", stroke: "#f59e0b", strokeWidth: "1.5", opacity: "0.9" })
+        ] }),
+        /* @__PURE__ */ jsx("defs", { children: /* @__PURE__ */ jsxs("linearGradient", { id: "trendGrad", x1: "0", y1: "0", x2: "0", y2: "1", children: [
+          /* @__PURE__ */ jsx("stop", { offset: "0%", stopColor: "#f59e0b", stopOpacity: "0.6" }),
+          /* @__PURE__ */ jsx("stop", { offset: "100%", stopColor: "#f59e0b", stopOpacity: "0.05" })
+        ] }) }),
+        trendData.length >= 2 && (() => {
+          const last = trendData[trendData.length - 1];
+          const maxE = Math.max(1, ...trendData.map((d) => d.energy));
+          const px = MARGIN.left + (trendData.length - 1) / (TREND_MAX_POINTS - 1) * PLOT_W;
+          const py = MARGIN.top + plotHTrend - last.energy / maxE * plotHTrend * 0.9;
+          return /* @__PURE__ */ jsxs(Fragment, { children: [
+            /* @__PURE__ */ jsx("circle", { cx: px, cy: py, r: "3", fill: "#f59e0b", opacity: "0.9" }),
+            /* @__PURE__ */ jsx("text", { x: px + 6, y: py + 3, fill: "#fbbf24", fontSize: "7", fontFamily: "monospace", fontWeight: "bold", children: last.energy.toFixed(2) })
+          ] });
+        })(),
+        rpm <= 0 && /* @__PURE__ */ jsx("text", { x: W / 2, y: H_TREND / 2, fill: "#4b5563", fontSize: "10", textAnchor: "middle", fontFamily: "monospace", children: "No data" })
       ] }) })
     ] })
   ] });
@@ -919,7 +995,7 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
         @keyframes bearingSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       ` }),
     /* @__PURE__ */ jsxs("div", { className: "absolute inset-0 grid place-items-center", children: [
-      /* @__PURE__ */ jsxs("svg", { viewBox: "-10 -50 120 160", className: "w-[min(70vh,70vw)] h-[min(70vh,70vw)] max-w-[640px] max-h-[640px]", children: [
+      /* @__PURE__ */ jsxs("svg", { viewBox: "-30 -50 160 175", className: "w-[min(70vh,70vw)] h-[min(70vh,70vw)] max-w-[640px] max-h-[640px]", children: [
         showHousing && (() => {
           const sag = deflectY * 1.2;
           const outerPath = `
@@ -998,21 +1074,28 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
           },
           i
         )) }),
-        showHousing && /* @__PURE__ */ jsxs("g", { children: [
-          /* @__PURE__ */ jsx("rect", { x: "95", y: "-2", width: "5", height: "8", rx: "1.5", fill: "#5a5a6a", stroke: "#7a7a8a", strokeWidth: "0.6" }),
-          /* @__PURE__ */ jsx("circle", { cx: "97.5", cy: "-2", r: "2", fill: "#6a6a7a", stroke: "#8a8a9a", strokeWidth: "0.5" }),
-          /* @__PURE__ */ jsx("path", { d: "M 100,2 Q 112,2 114,10 Q 116,18 114,22", fill: "none", stroke: "#444", strokeWidth: "1.8", strokeLinecap: "round" }),
-          /* @__PURE__ */ jsx("rect", { x: "108", y: "22", width: "12", height: "30", rx: "2", fill: "#3a3a4a", stroke: "#5a5a6a", strokeWidth: "0.8" }),
-          /* @__PURE__ */ jsx("rect", { x: "109.5", y: 23 + (1 - Math.max(0, 1 - greaseLevel)) * 28, width: "9", height: Math.max(0, 1 - greaseLevel) * 28, rx: "1", fill: "#c4a832", opacity: "0.6" }),
-          /* @__PURE__ */ jsx("rect", { x: "106", y: 22 - 12 + pumpStroke * 12, width: "16", height: "3", rx: "1", fill: "#6a6a7a", stroke: "#8a8a9a", strokeWidth: "0.5" }),
-          /* @__PURE__ */ jsx("rect", { x: "110", y: 22 - 16 + pumpStroke * 12, width: "8", height: "5", rx: "1.5", fill: "#888", stroke: "#aaa", strokeWidth: "0.4" }),
-          /* @__PURE__ */ jsx("rect", { x: "113", y: 22 - 12 + pumpStroke * 12, width: "2", height: 12 - pumpStroke * 10, fill: "#777" }),
-          greaseLevel > 0 && pumpStroke > 0.3 && /* @__PURE__ */ jsxs(Fragment, { children: [
-            /* @__PURE__ */ jsx("circle", { cx: "97.5", cy: "3", r: "1.2", fill: "#c4a832", opacity: "0.8" }),
-            /* @__PURE__ */ jsx("circle", { cx: "96", cy: "6", r: "0.9", fill: "#c4a832", opacity: "0.6" }),
-            /* @__PURE__ */ jsx("circle", { cx: "99", cy: "6", r: "0.9", fill: "#c4a832", opacity: "0.6" })
-          ] })
-        ] }),
+        (() => {
+          const nippleX = showHousing ? 95 : 88;
+          const nippleY = showHousing ? -2 : 15;
+          const pumpOffX = showHousing ? 108 : 102;
+          const pumpOffY = showHousing ? 22 : 32;
+          const hosePath = showHousing ? `M ${nippleX + 5},${nippleY + 4} Q ${nippleX + 17},${nippleY + 4} ${nippleX + 19},${nippleY + 12} Q ${nippleX + 21},${nippleY + 20} ${nippleX + 19},${nippleY + 24}` : `M ${nippleX + 5},${nippleY + 4} Q ${nippleX + 12},${nippleY + 6} ${nippleX + 14},${nippleY + 14} Q ${nippleX + 15},${nippleY + 18} ${pumpOffX + 6},${pumpOffY}`;
+          return /* @__PURE__ */ jsxs("g", { children: [
+            /* @__PURE__ */ jsx("rect", { x: nippleX, y: nippleY, width: "5", height: "8", rx: "1.5", fill: "#5a5a6a", stroke: "#7a7a8a", strokeWidth: "0.6" }),
+            /* @__PURE__ */ jsx("circle", { cx: nippleX + 2.5, cy: nippleY, r: "2", fill: "#6a6a7a", stroke: "#8a8a9a", strokeWidth: "0.5" }),
+            /* @__PURE__ */ jsx("path", { d: hosePath, fill: "none", stroke: "#444", strokeWidth: "1.8", strokeLinecap: "round" }),
+            /* @__PURE__ */ jsx("rect", { x: pumpOffX, y: pumpOffY, width: "12", height: "30", rx: "2", fill: "#3a3a4a", stroke: "#5a5a6a", strokeWidth: "0.8" }),
+            /* @__PURE__ */ jsx("rect", { x: pumpOffX + 1.5, y: pumpOffY + 1 + (1 - Math.max(0, 1 - greaseLevel)) * 28, width: "9", height: Math.max(0, 1 - greaseLevel) * 28, rx: "1", fill: "#c4a832", opacity: "0.6" }),
+            /* @__PURE__ */ jsx("rect", { x: pumpOffX - 2, y: pumpOffY - 12 + pumpStroke * 12, width: "16", height: "3", rx: "1", fill: "#6a6a7a", stroke: "#8a8a9a", strokeWidth: "0.5" }),
+            /* @__PURE__ */ jsx("rect", { x: pumpOffX + 2, y: pumpOffY - 16 + pumpStroke * 12, width: "8", height: "5", rx: "1.5", fill: "#888", stroke: "#aaa", strokeWidth: "0.4" }),
+            /* @__PURE__ */ jsx("rect", { x: pumpOffX + 5, y: pumpOffY - 12 + pumpStroke * 12, width: "2", height: 12 - pumpStroke * 10, fill: "#777" }),
+            greaseLevel > 0 && pumpStroke > 0.3 && /* @__PURE__ */ jsxs(Fragment, { children: [
+              /* @__PURE__ */ jsx("circle", { cx: nippleX + 2.5, cy: nippleY + 5, r: "1.2", fill: "#c4a832", opacity: "0.8" }),
+              /* @__PURE__ */ jsx("circle", { cx: nippleX + 1, cy: nippleY + 8, r: "0.9", fill: "#c4a832", opacity: "0.6" }),
+              /* @__PURE__ */ jsx("circle", { cx: nippleX + 4, cy: nippleY + 8, r: "0.9", fill: "#c4a832", opacity: "0.6" })
+            ] })
+          ] });
+        })(),
         leakDrops.length > 0 && /* @__PURE__ */ jsxs("g", { children: [
           leakDrops.map((d, i) => /* @__PURE__ */ jsx(
             "ellipse",
@@ -1058,18 +1141,22 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
           ] })
         ] }),
         (() => {
-          const sensorY = showHousing ? -14 : 14;
-          const sensorX = 80;
-          const cablePath = showHousing ? `M ${sensorX + 12},${sensorY + 3.5} Q ${sensorX + 18},${sensorY + 3} ${sensorX + 22},${sensorY} Q ${sensorX + 28},${sensorY - 3} ${sensorX + 35},${sensorY - 3}` : `M 92,17.5 Q 98,17.5 102,15 Q 108,12 115,12`;
-          const connX = showHousing ? sensorX + 33.5 : 113.5;
-          const connY = showHousing ? sensorY - 5 : 10;
-          const studY1 = sensorY + 7;
-          const studY2 = showHousing ? sensorY + 11 : sensorY + 11;
+          const sensorX = showHousing ? -18 : -12;
+          const sensorY = showHousing ? 30 : 38;
+          const gwX = sensorX - 4;
+          const gwY = sensorY - 22;
+          const cablePath = `M ${sensorX},${sensorY} Q ${sensorX - 4},${sensorY - 6} ${sensorX - 4},${sensorY - 12} Q ${sensorX - 3},${sensorY - 16} ${gwX + 9},${gwY + 12}`;
+          const connX = gwX + 7;
+          const connY = gwY + 10;
+          const studX = sensorX + 6;
+          const studY1 = sensorY + 8;
+          const outerRingX = showHousing ? 3 : 6;
+          const outerRingY = showHousing ? sensorY + 4 : sensorY + 4;
           return /* @__PURE__ */ jsxs("g", { children: [
             /* @__PURE__ */ jsx("rect", { x: sensorX, y: sensorY, width: "12", height: "8", rx: "1.5", fill: "#2a3a50", stroke: "#4a90d9", strokeWidth: "0.8" }),
             /* @__PURE__ */ jsx("text", { x: sensorX + 6, y: sensorY + 5.5, fill: "#4a90d9", fontSize: "3.8", textAnchor: "middle", fontFamily: "monospace", fontWeight: "bold", children: "ACC" }),
             /* @__PURE__ */ jsx("circle", { cx: sensorX + 10, cy: sensorY + 1.8, r: "0.9", fill: isPlaying && rpm > 0 ? "#22d3ee" : "#1a2a3a", opacity: isPlaying && rpm > 0 ? 0.9 : 0.4, children: isPlaying && rpm > 0 && /* @__PURE__ */ jsx("animate", { attributeName: "opacity", values: "0.9;0.3;0.9", dur: "1.5s", repeatCount: "indefinite" }) }),
-            /* @__PURE__ */ jsx("line", { x1: sensorX + 6, y1: studY1, x2: sensorX + 6, y2: studY2, stroke: "#4a6a8a", strokeWidth: "1.8", strokeLinecap: "round" }),
+            /* @__PURE__ */ jsx("line", { x1: studX, y1: studY1, x2: outerRingX, y2: outerRingY, stroke: "#4a6a8a", strokeWidth: "1.8", strokeLinecap: "round" }),
             /* @__PURE__ */ jsx("path", { d: cablePath, fill: "none", stroke: "#2a5a8a", strokeWidth: "1.8", strokeLinecap: "round", opacity: "0.6" }),
             /* @__PURE__ */ jsx("path", { d: cablePath, fill: "none", stroke: "#22d3ee", strokeWidth: "1", opacity: isPlaying && rpm > 0 ? 0.6 : 0 }),
             isPlaying && rpm > 0 && /* @__PURE__ */ jsxs(Fragment, { children: [
@@ -1077,7 +1164,19 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
               /* @__PURE__ */ jsx("circle", { r: "1.2", fill: "#22d3ee", opacity: "0.5", children: /* @__PURE__ */ jsx("animateMotion", { dur: "1s", repeatCount: "indefinite", begin: "0.33s", path: cablePath }) }),
               /* @__PURE__ */ jsx("circle", { r: "0.8", fill: "#22d3ee", opacity: "0.3", children: /* @__PURE__ */ jsx("animateMotion", { dur: "1s", repeatCount: "indefinite", begin: "0.66s", path: cablePath }) })
             ] }),
-            /* @__PURE__ */ jsx("rect", { x: connX, y: connY, width: "3", height: "4", rx: "0.8", fill: "#2a4a6a", stroke: "#4a90d9", strokeWidth: "0.5" })
+            /* @__PURE__ */ jsx("rect", { x: connX, y: connY, width: "3", height: "4", rx: "0.8", fill: "#2a4a6a", stroke: "#4a90d9", strokeWidth: "0.5" }),
+            /* @__PURE__ */ jsx("rect", { x: gwX, y: gwY, width: "18", height: "12", rx: "2", fill: "#1a2838", stroke: "#3a7abf", strokeWidth: "0.7" }),
+            /* @__PURE__ */ jsx("text", { x: gwX + 9, y: gwY + 5, fill: "#5a9ad9", fontSize: "3", textAnchor: "middle", fontFamily: "monospace", fontWeight: "bold", children: "GW" }),
+            /* @__PURE__ */ jsx("text", { x: gwX + 9, y: gwY + 9, fill: "#4a7aaa", fontSize: "2", textAnchor: "middle", fontFamily: "monospace", children: "IoT" }),
+            /* @__PURE__ */ jsx("circle", { cx: gwX + 15.5, cy: gwY + 2.5, r: "0.8", fill: isPlaying && rpm > 0 ? "#4ade80" : "#334", opacity: isPlaying && rpm > 0 ? 0.9 : 0.4, children: isPlaying && rpm > 0 && /* @__PURE__ */ jsx("animate", { attributeName: "opacity", values: "0.9;0.4;0.9", dur: "2s", repeatCount: "indefinite" }) }),
+            /* @__PURE__ */ jsx("line", { x1: gwX + 2, y1: gwY, x2: gwX + 2, y2: gwY - 6, stroke: "#5a8aba", strokeWidth: "0.8", strokeLinecap: "round" }),
+            /* @__PURE__ */ jsx("circle", { cx: gwX + 2, cy: gwY - 6, r: "1", fill: "#5a8aba" }),
+            isPlaying && rpm > 0 && /* @__PURE__ */ jsxs("g", { opacity: "0.7", children: [
+              /* @__PURE__ */ jsx("path", { d: `M ${gwX + 9},${gwY} Q ${gwX + 6},${gwY - 12} ${gwX + 2},${gwY - 22}`, fill: "none", stroke: "#22d3ee", strokeWidth: "0.5", strokeDasharray: "2 2", children: /* @__PURE__ */ jsx("animate", { attributeName: "stroke-dashoffset", from: "0", to: "-8", dur: "1s", repeatCount: "indefinite" }) }),
+              /* @__PURE__ */ jsx("path", { d: `M ${gwX + 12},${gwY} Q ${gwX + 14},${gwY - 10} ${gwX + 10},${gwY - 20}`, fill: "none", stroke: "#22d3ee", strokeWidth: "0.5", strokeDasharray: "2 2", children: /* @__PURE__ */ jsx("animate", { attributeName: "stroke-dashoffset", from: "0", to: "-8", dur: "1.2s", repeatCount: "indefinite" }) }),
+              /* @__PURE__ */ jsx("path", { d: `M ${gwX - 1},${gwY - 8} Q ${gwX + 2},${gwY - 13} ${gwX + 5},${gwY - 8}`, fill: "none", stroke: "#22d3ee", strokeWidth: "0.4", opacity: "0.5", children: /* @__PURE__ */ jsx("animate", { attributeName: "opacity", values: "0.5;0.1;0.5", dur: "1.5s", repeatCount: "indefinite" }) }),
+              /* @__PURE__ */ jsx("path", { d: `M ${gwX - 3},${gwY - 9} Q ${gwX + 2},${gwY - 16} ${gwX + 7},${gwY - 9}`, fill: "none", stroke: "#22d3ee", strokeWidth: "0.3", opacity: "0.3", children: /* @__PURE__ */ jsx("animate", { attributeName: "opacity", values: "0.3;0.05;0.3", dur: "1.5s", repeatCount: "indefinite", begin: "0.3s" }) })
+            ] })
           ] });
         })()
       ] }),
@@ -1122,9 +1221,17 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
         ] })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "absolute top-0 right-1 bottom-0 w-[620px] max-w-[52%] flex flex-col justify-center opacity-95", children: [
-        /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1.5 mb-1.5 px-1", children: [
-          /* @__PURE__ */ jsx("div", { className: `w-2 h-2 rounded-full ${isPlaying && rpm > 0 ? "bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.7)]" : "bg-gray-600"}` }),
-          /* @__PURE__ */ jsx("span", { className: "text-[10px] font-mono text-gray-400 uppercase tracking-wider", children: isPlaying && rpm > 0 ? "Accelerometer — Live" : "Accelerometer — Idle" })
+        /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 mb-1 px-1", children: [
+          /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1.5", children: [
+            /* @__PURE__ */ jsx("div", { className: `w-2 h-2 rounded-full ${isPlaying && rpm > 0 ? "bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.7)]" : "bg-gray-600"}` }),
+            /* @__PURE__ */ jsx("span", { className: "text-[10px] font-mono text-gray-400 uppercase tracking-wider", children: isPlaying && rpm > 0 ? "Accelerometer — Live" : "Accelerometer — Idle" })
+          ] }),
+          /* @__PURE__ */ jsx("span", { className: "text-[9px] text-gray-500 mx-1", children: "→" }),
+          /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1 bg-slate-800/60 border border-slate-600/40 rounded px-2 py-0.5", children: [
+            /* @__PURE__ */ jsx("svg", { width: "12", height: "9", viewBox: "0 0 16 11", className: "opacity-70", children: /* @__PURE__ */ jsx("path", { d: "M13 6.5a2.5 2.5 0 0 0-2.4-2.5 4 4 0 0 0-7.7 1A3 3 0 0 0 3 11h10a2.5 2.5 0 0 0 0-5z", fill: "none", stroke: "#60a5fa", strokeWidth: "1.2" }) }),
+            /* @__PURE__ */ jsx("span", { className: "text-[10px] font-mono text-blue-400 uppercase tracking-wider", children: "Cloud Analytics" }),
+            isPlaying && rpm > 0 && /* @__PURE__ */ jsx("span", { className: "text-[8px] text-emerald-400 animate-pulse", children: "● LIVE" })
+          ] })
         ] }),
         /* @__PURE__ */ jsx(VibrationChart, { rpm, isPlaying, loadForce, greaseLevel, damage })
       ] })
@@ -1140,7 +1247,7 @@ function meta({}) {
   }];
 }
 const home = UNSAFE_withComponentProps(function Home() {
-  const [rpm, setRpm] = useState(0.1);
+  const [rpm, setRpm] = useState(5);
   const [direction, setDirection] = useState("cw");
   const [isPlaying, setIsPlaying] = useState(true);
   const [loadForce, setLoadForce] = useState(1);
@@ -1241,7 +1348,7 @@ const route1 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProper
   default: home,
   meta
 }, Symbol.toStringTag, { value: "Module" }));
-const serverManifest = { "entry": { "module": "/spinning_bearing/assets/entry.client-CftM3kWu.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": true, "module": "/spinning_bearing/assets/root-G6x9zYPl.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": ["/spinning_bearing/assets/root-B1Es2ZZL.css"], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/home": { "id": "routes/home", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": false, "module": "/spinning_bearing/assets/home-sbZsHBe7.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 } }, "url": "/spinning_bearing/assets/manifest-41a05c8c.js", "version": "41a05c8c", "sri": void 0 };
+const serverManifest = { "entry": { "module": "/spinning_bearing/assets/entry.client-CftM3kWu.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": true, "module": "/spinning_bearing/assets/root-Bs_IAvJp.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": ["/spinning_bearing/assets/root-K49Q2lK0.css"], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/home": { "id": "routes/home", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": false, "module": "/spinning_bearing/assets/home-D_BEryRW.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 } }, "url": "/spinning_bearing/assets/manifest-fc567910.js", "version": "fc567910", "sri": void 0 };
 const assetsBuildDirectory = "build/client";
 const basename = "/spinning_bearing/";
 const future = { "v8_middleware": false, "unstable_optimizeDeps": true, "unstable_splitRouteModules": false, "unstable_subResourceIntegrity": false, "unstable_viteEnvironmentApi": false };

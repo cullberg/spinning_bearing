@@ -21,8 +21,9 @@ const BSF_MULT = (PITCH_DIAMETER / (2 * BALL_DIAMETER)) * (1 - BD_PD ** 2);
 const FTF_MULT = 0.5 * (1 - BD_PD);
 
 const W = 700;
-const H_WAVE = 240;
-const H_FFT = 280;
+const H_WAVE = 200;
+const H_FFT = 220;
+const H_TREND = 160;
 const MARGIN = { left: 40, right: 14, top: 10, bottom: 20 };
 const PLOT_W = W - MARGIN.left - MARGIN.right;
 
@@ -31,6 +32,11 @@ export default function VibrationChart({ rpm, isPlaying, loadForce, greaseLevel,
   const timeRef = useRef(0);
   const lastTsRef = useRef(0);
   const [tick, setTick] = useState(0);
+
+  // Impact energy trend — rolling history of RMS vibration level
+  const TREND_MAX_POINTS = 120;
+  const trendRef = useRef<{ t: number; energy: number }[]>([]);
+  const trendTimeRef = useRef(0);
 
   // Animate the waveform
   useEffect(() => {
@@ -41,13 +47,39 @@ export default function VibrationChart({ rpm, isPlaying, loadForce, greaseLevel,
       lastTsRef.current = ts;
       if (isPlaying && rpm > 0) {
         timeRef.current += dt;
+        // Sample impact energy every 0.25s
+        trendTimeRef.current += dt;
+        if (trendTimeRef.current >= 3.0) {
+          trendTimeRef.current = 0;
+          const tau = Math.PI * 2;
+          const sf = rpm / 60;
+          const t = timeRef.current;
+          // RMS approximation from summed component amplitudes
+          let e = 0;
+          e += Math.abs(Math.sin(tau * sf * t)) * 0.3;
+          e += Math.abs(Math.sin(tau * sf * BPFO_MULT * t)) * 0.6;
+          e += Math.abs(Math.sin(tau * sf * BPFI_MULT * t)) * 0.4;
+          e += Math.abs(Math.sin(tau * sf * BSF_MULT * t)) * 0.3;
+          // Scale by conditions
+          const frictionMult = greaseLevel < 0.3 ? 1.0 + (1 - greaseLevel / 0.3) * 0.6 : 1.0;
+          e *= frictionMult * (0.5 + loadForce * 0.3);
+          if (damage === "outer-spall") e *= 2.5;
+          else if (damage === "inner-spall") e *= 2.2;
+          else if (damage === "ball-defect") e *= 2.0;
+          // Add some noise
+          e += (Math.random() - 0.5) * 0.05;
+          e = Math.max(0, e);
+          const arr = trendRef.current;
+          arr.push({ t: timeRef.current, energy: e });
+          if (arr.length > TREND_MAX_POINTS) arr.shift();
+        }
       }
       setTick((t) => t + 1);
       frameId = requestAnimationFrame(loop);
     };
     frameId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frameId);
-  }, [isPlaying, rpm]);
+  }, [isPlaying, rpm, greaseLevel, loadForce, damage]);
 
   // Component amplitudes — influenced by load, grease, and damage
   const amps = useMemo(() => {
@@ -201,6 +233,28 @@ export default function VibrationChart({ rpm, isPlaying, loadForce, greaseLevel,
 
   const plotHWave = H_WAVE - MARGIN.top - MARGIN.bottom;
   const plotHFft = H_FFT - MARGIN.top - MARGIN.bottom;
+  const plotHTrend = H_TREND - MARGIN.top - MARGIN.bottom;
+
+  // Build trend path
+  const trendData = trendRef.current;
+  const trendPath = useMemo(() => {
+    if (trendData.length < 2) return "";
+    const pts: string[] = [];
+    const maxE = Math.max(1.0, ...trendData.map((d) => d.energy));
+    for (let i = 0; i < trendData.length; i++) {
+      const px = MARGIN.left + (i / (TREND_MAX_POINTS - 1)) * PLOT_W;
+      const py = MARGIN.top + plotHTrend - (trendData[i].energy / maxE) * plotHTrend * 0.9;
+      pts.push(`${i === 0 ? "M" : "L"}${px.toFixed(1)},${py.toFixed(1)}`);
+    }
+    return pts.join(" ");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trendData.length, tick, plotHTrend]);
+
+  // Alarm threshold line
+  const alarmLevel = useMemo(() => {
+    if (trendData.length < 2) return 0;
+    return Math.max(1.0, ...trendData.map((d) => d.energy)) * 0.75;
+  }, [trendData.length, tick]);
 
   return (
     <div className="flex flex-col gap-1.5 w-full select-none">
@@ -270,6 +324,63 @@ export default function VibrationChart({ rpm, isPlaying, loadForce, greaseLevel,
           })}
           {rpm <= 0 && (
             <text x={W / 2} y={H_FFT / 2} fill="#4b5563" fontSize="10" textAnchor="middle" fontFamily="monospace">No signal</text>
+          )}
+        </svg>
+        </div>
+      </div>
+
+      {/* Impact Energy Trend */}
+      <div>
+        <div className="text-[9px] font-mono text-gray-500 uppercase tracking-wider mb-0.5 px-0.5">Impact Energy Trend</div>
+        <div className="bg-[#0c0f1a] rounded border border-gray-800/60 overflow-hidden">
+        <svg viewBox={`0 0 ${W} ${H_TREND}`} className="w-full" preserveAspectRatio="xMidYMid meet">
+          {/* Grid */}
+          <line x1={MARGIN.left} y1={MARGIN.top + plotHTrend} x2={W - MARGIN.right} y2={MARGIN.top + plotHTrend} stroke="#1e2940" strokeWidth="0.5" />
+          <line x1={MARGIN.left} y1={MARGIN.top} x2={MARGIN.left} y2={MARGIN.top + plotHTrend} stroke="#1e2940" strokeWidth="0.5" />
+          {/* Horizontal grid lines */}
+          {[0.25, 0.5, 0.75].map((f) => (
+            <line key={f} x1={MARGIN.left} y1={MARGIN.top + plotHTrend * (1 - f)} x2={W - MARGIN.right} y2={MARGIN.top + plotHTrend * (1 - f)} stroke="#1a2235" strokeWidth="0.3" />
+          ))}
+          {/* Labels */}
+          <text x={4} y={MARGIN.top + plotHTrend / 2} fill="#6b7280" fontSize="8" dominantBaseline="middle" fontFamily="monospace">kE</text>
+          <text x={W - MARGIN.right} y={H_TREND - 3} fill="#6b7280" fontSize="7" textAnchor="end" fontFamily="monospace">Time (30s window)</text>
+          {/* Alarm threshold */}
+          {trendData.length >= 2 && (
+            <>
+              <line x1={MARGIN.left} y1={MARGIN.top + plotHTrend * 0.25} x2={W - MARGIN.right} y2={MARGIN.top + plotHTrend * 0.25} stroke="#ef4444" strokeWidth="0.5" strokeDasharray="4 3" opacity="0.5" />
+              <text x={W - MARGIN.right - 2} y={MARGIN.top + plotHTrend * 0.25 - 3} fill="#ef4444" fontSize="6" textAnchor="end" fontFamily="monospace" opacity="0.7">ALARM</text>
+            </>
+          )}
+          {/* Trend line */}
+          {trendPath && (
+            <>
+              {/* Fill area under curve */}
+              <path d={`${trendPath} L${MARGIN.left + ((trendData.length - 1) / (TREND_MAX_POINTS - 1)) * PLOT_W},${MARGIN.top + plotHTrend} L${MARGIN.left},${MARGIN.top + plotHTrend} Z`} fill="url(#trendGrad)" opacity="0.3" />
+              <path d={trendPath} fill="none" stroke="#f59e0b" strokeWidth="1.5" opacity="0.9" />
+            </>
+          )}
+          {/* Gradient definition */}
+          <defs>
+            <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.6" />
+              <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.05" />
+            </linearGradient>
+          </defs>
+          {/* Current value dot */}
+          {trendData.length >= 2 && (() => {
+            const last = trendData[trendData.length - 1];
+            const maxE = Math.max(1.0, ...trendData.map((d) => d.energy));
+            const px = MARGIN.left + ((trendData.length - 1) / (TREND_MAX_POINTS - 1)) * PLOT_W;
+            const py = MARGIN.top + plotHTrend - (last.energy / maxE) * plotHTrend * 0.9;
+            return (
+              <>
+                <circle cx={px} cy={py} r="3" fill="#f59e0b" opacity="0.9" />
+                <text x={px + 6} y={py + 3} fill="#fbbf24" fontSize="7" fontFamily="monospace" fontWeight="bold">{last.energy.toFixed(2)}</text>
+              </>
+            );
+          })()}
+          {rpm <= 0 && (
+            <text x={W / 2} y={H_TREND / 2} fill="#4b5563" fontSize="10" textAnchor="middle" fontFamily="monospace">No data</text>
           )}
         </svg>
         </div>

@@ -12,7 +12,7 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export default function Home() {
-  const [rpm, setRpm] = useState(0.1);
+  const [rpm, setRpm] = useState(5);
   const [direction, setDirection] = useState<"cw" | "ccw">("cw");
   const [isPlaying, setIsPlaying] = useState(true);
   const [loadForce, setLoadForce] = useState(1.0);

@@ -205,7 +205,7 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
       `}</style>
 
       <div className="absolute inset-0 grid place-items-center">
-        <svg viewBox="-10 -50 120 160" className="w-[min(70vh,70vw)] h-[min(70vh,70vw)] max-w-[640px] max-h-[640px]">
+        <svg viewBox="-30 -50 160 175" className="w-[min(70vh,70vw)] h-[min(70vh,70vw)] max-w-[640px] max-h-[640px]">
           {/* Housing — deflects slightly under reaction load from outer ring */}
           {showHousing && (() => {
             const sag = deflectY * 1.2; // bottom sags from reaction force
@@ -311,34 +311,45 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
             </g>
           )}
 
-          {/* Grease nipple + hand pump — on housing */}
-          {showHousing && (
-            <g>
-              {/* Nipple fitting on housing */}
-              <rect x="95" y="-2" width="5" height="8" rx="1.5" fill="#5a5a6a" stroke="#7a7a8a" strokeWidth="0.6" />
-              <circle cx="97.5" cy="-2" r="2" fill="#6a6a7a" stroke="#8a8a9a" strokeWidth="0.5" />
-              {/* Hose from nipple to pump */}
-              <path d="M 100,2 Q 112,2 114,10 Q 116,18 114,22" fill="none" stroke="#444" strokeWidth="1.8" strokeLinecap="round" />
-              {/* Pump body (cylinder) */}
-              <rect x="108" y="22" width="12" height="30" rx="2" fill="#3a3a4a" stroke="#5a5a6a" strokeWidth="0.8" />
-              {/* Grease level inside pump — decreases as you pump */}
-              <rect x="109.5" y={23 + (1 - Math.max(0, 1 - greaseLevel)) * 28} width="9" height={Math.max(0, 1 - greaseLevel) * 28} rx="1" fill="#c4a832" opacity="0.6" />
-              {/* Pump handle bar */}
-              <rect x="106" y={22 - 12 + pumpStroke * 12} width="16" height="3" rx="1" fill="#6a6a7a" stroke="#8a8a9a" strokeWidth="0.5" />
-              {/* Handle grip */}
-              <rect x="110" y={22 - 16 + pumpStroke * 12} width="8" height="5" rx="1.5" fill="#888" stroke="#aaa" strokeWidth="0.4" />
-              {/* Pump rod */}
-              <rect x="113" y={22 - 12 + pumpStroke * 12} width="2" height={12 - pumpStroke * 10} fill="#777" />
-              {/* Grease flow from nipple when recently pumped */}
-              {greaseLevel > 0 && pumpStroke > 0.3 && (
-                <>
-                  <circle cx="97.5" cy="3" r="1.2" fill="#c4a832" opacity="0.8" />
-                  <circle cx="96" cy="6" r="0.9" fill="#c4a832" opacity="0.6" />
-                  <circle cx="99" cy="6" r="0.9" fill="#c4a832" opacity="0.6" />
-                </>
-              )}
-            </g>
-          )}
+          {/* Grease nipple + hand pump — always visible */}
+          {(() => {
+            // With housing: nipple on housing top-right, pump right of housing
+            // Without housing: nipple on outer ring at ~2 o'clock, pump dangling right
+            const nippleX = showHousing ? 95 : 88;
+            const nippleY = showHousing ? -2 : 15;
+            const pumpOffX = showHousing ? 108 : 102;
+            const pumpOffY = showHousing ? 22 : 32;
+            const hosePath = showHousing
+              ? `M ${nippleX + 5},${nippleY + 4} Q ${nippleX + 17},${nippleY + 4} ${nippleX + 19},${nippleY + 12} Q ${nippleX + 21},${nippleY + 20} ${nippleX + 19},${nippleY + 24}`
+              : `M ${nippleX + 5},${nippleY + 4} Q ${nippleX + 12},${nippleY + 6} ${nippleX + 14},${nippleY + 14} Q ${nippleX + 15},${nippleY + 18} ${pumpOffX + 6},${pumpOffY}`;
+            return (
+              <g>
+                {/* Nipple fitting */}
+                <rect x={nippleX} y={nippleY} width="5" height="8" rx="1.5" fill="#5a5a6a" stroke="#7a7a8a" strokeWidth="0.6" />
+                <circle cx={nippleX + 2.5} cy={nippleY} r="2" fill="#6a6a7a" stroke="#8a8a9a" strokeWidth="0.5" />
+                {/* Hose from nipple to pump */}
+                <path d={hosePath} fill="none" stroke="#444" strokeWidth="1.8" strokeLinecap="round" />
+                {/* Pump body (cylinder) */}
+                <rect x={pumpOffX} y={pumpOffY} width="12" height="30" rx="2" fill="#3a3a4a" stroke="#5a5a6a" strokeWidth="0.8" />
+                {/* Grease level inside pump */}
+                <rect x={pumpOffX + 1.5} y={pumpOffY + 1 + (1 - Math.max(0, 1 - greaseLevel)) * 28} width="9" height={Math.max(0, 1 - greaseLevel) * 28} rx="1" fill="#c4a832" opacity="0.6" />
+                {/* Pump handle bar */}
+                <rect x={pumpOffX - 2} y={pumpOffY - 12 + pumpStroke * 12} width="16" height="3" rx="1" fill="#6a6a7a" stroke="#8a8a9a" strokeWidth="0.5" />
+                {/* Handle grip */}
+                <rect x={pumpOffX + 2} y={pumpOffY - 16 + pumpStroke * 12} width="8" height="5" rx="1.5" fill="#888" stroke="#aaa" strokeWidth="0.4" />
+                {/* Pump rod */}
+                <rect x={pumpOffX + 5} y={pumpOffY - 12 + pumpStroke * 12} width="2" height={12 - pumpStroke * 10} fill="#777" />
+                {/* Grease flow from nipple when recently pumped */}
+                {greaseLevel > 0 && pumpStroke > 0.3 && (
+                  <>
+                    <circle cx={nippleX + 2.5} cy={nippleY + 5} r="1.2" fill="#c4a832" opacity="0.8" />
+                    <circle cx={nippleX + 1} cy={nippleY + 8} r="0.9" fill="#c4a832" opacity="0.6" />
+                    <circle cx={nippleX + 4} cy={nippleY + 8} r="0.9" fill="#c4a832" opacity="0.6" />
+                  </>
+                )}
+              </g>
+            );
+          })()}
 
           {/* Leak drips — grease overflow falling below housing */}
           {leakDrops.length > 0 && (
@@ -400,16 +411,20 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
 
           {/* Accelerometer sensor on housing/outer ring */}
           {(() => {
-            // When housing is shown, mount sensor on top of housing; otherwise on outer ring
-            const sensorY = showHousing ? -14 : 14;
-            const sensorX = 80;
-            const cablePath = showHousing
-              ? `M ${sensorX + 12},${sensorY + 3.5} Q ${sensorX + 18},${sensorY + 3} ${sensorX + 22},${sensorY} Q ${sensorX + 28},${sensorY - 3} ${sensorX + 35},${sensorY - 3}`
-              : `M 92,17.5 Q 98,17.5 102,15 Q 108,12 115,12`;
-            const connX = showHousing ? sensorX + 33.5 : 113.5;
-            const connY = showHousing ? sensorY - 5 : 10;
-            const studY1 = sensorY + 7;
-            const studY2 = showHousing ? sensorY + 11 : sensorY + 11;
+            // Sensor on left side of bearing; gateway above sensor
+            const sensorX = showHousing ? -18 : -12;
+            const sensorY = showHousing ? 30 : 38;
+            // Gateway box above sensor
+            const gwX = sensorX - 4;
+            const gwY = sensorY - 22;
+            const cablePath = `M ${sensorX},${sensorY} Q ${sensorX - 4},${sensorY - 6} ${sensorX - 4},${sensorY - 12} Q ${sensorX - 3},${sensorY - 16} ${gwX + 9},${gwY + 12}`;
+            const connX = gwX + 7;
+            const connY = gwY + 10;
+            const studX = sensorX + 6;
+            const studY1 = sensorY + 8;
+            // Mounting stud connects to outer ring (~x=3 at 9 o'clock)
+            const outerRingX = showHousing ? 3 : 6;
+            const outerRingY = showHousing ? sensorY + 4 : sensorY + 4;
             return (
               <g>
                 {/* Sensor body */}
@@ -422,12 +437,12 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
                     <animate attributeName="opacity" values="0.9;0.3;0.9" dur="1.5s" repeatCount="indefinite" />
                   )}
                 </circle>
-                {/* Mounting stud */}
-                <line x1={sensorX + 6} y1={studY1} x2={sensorX + 6} y2={studY2} stroke="#4a6a8a" strokeWidth="1.8" strokeLinecap="round" />
-                {/* Cable */}
+                {/* Mounting stud — connects to outer ring */}
+                <line x1={studX} y1={studY1} x2={outerRingX} y2={outerRingY} stroke="#4a6a8a" strokeWidth="1.8" strokeLinecap="round" />
+                {/* Cable to gateway */}
                 <path d={cablePath} fill="none" stroke="#2a5a8a" strokeWidth="1.8" strokeLinecap="round" opacity="0.6" />
                 <path d={cablePath} fill="none" stroke="#22d3ee" strokeWidth="1" opacity={isPlaying && rpm > 0 ? 0.6 : 0} />
-                {/* Animated signal pulses */}
+                {/* Animated signal pulses along cable */}
                 {isPlaying && rpm > 0 && (
                   <>
                     <circle r="1.8" fill="#22d3ee" opacity="0.8">
@@ -441,8 +456,41 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
                     </circle>
                   </>
                 )}
-                {/* Connector */}
+                {/* Cable connector at gateway */}
                 <rect x={connX} y={connY} width="3" height="4" rx="0.8" fill="#2a4a6a" stroke="#4a90d9" strokeWidth="0.5" />
+
+                {/* ── IoT Gateway box ── */}
+                <rect x={gwX} y={gwY} width="18" height="12" rx="2" fill="#1a2838" stroke="#3a7abf" strokeWidth="0.7" />
+                <text x={gwX + 9} y={gwY + 5} fill="#5a9ad9" fontSize="3" textAnchor="middle" fontFamily="monospace" fontWeight="bold">GW</text>
+                <text x={gwX + 9} y={gwY + 9} fill="#4a7aaa" fontSize="2" textAnchor="middle" fontFamily="monospace">IoT</text>
+                {/* Gateway status LED */}
+                <circle cx={gwX + 15.5} cy={gwY + 2.5} r="0.8" fill={isPlaying && rpm > 0 ? "#4ade80" : "#334"} opacity={isPlaying && rpm > 0 ? 0.9 : 0.4}>
+                  {isPlaying && rpm > 0 && (
+                    <animate attributeName="opacity" values="0.9;0.4;0.9" dur="2s" repeatCount="indefinite" />
+                  )}
+                </circle>
+                {/* WiFi antenna */}
+                <line x1={gwX + 2} y1={gwY} x2={gwX + 2} y2={gwY - 6} stroke="#5a8aba" strokeWidth="0.8" strokeLinecap="round" />
+                <circle cx={gwX + 2} cy={gwY - 6} r="1" fill="#5a8aba" />
+
+                {/* ── Wireless signal arcs from gateway upward to cloud ── */}
+                {isPlaying && rpm > 0 && (
+                  <g opacity="0.7">
+                    <path d={`M ${gwX + 9},${gwY} Q ${gwX + 6},${gwY - 12} ${gwX + 2},${gwY - 22}`} fill="none" stroke="#22d3ee" strokeWidth="0.5" strokeDasharray="2 2">
+                      <animate attributeName="stroke-dashoffset" from="0" to="-8" dur="1s" repeatCount="indefinite" />
+                    </path>
+                    <path d={`M ${gwX + 12},${gwY} Q ${gwX + 14},${gwY - 10} ${gwX + 10},${gwY - 20}`} fill="none" stroke="#22d3ee" strokeWidth="0.5" strokeDasharray="2 2">
+                      <animate attributeName="stroke-dashoffset" from="0" to="-8" dur="1.2s" repeatCount="indefinite" />
+                    </path>
+                    {/* Radio wave arcs above antenna */}
+                    <path d={`M ${gwX - 1},${gwY - 8} Q ${gwX + 2},${gwY - 13} ${gwX + 5},${gwY - 8}`} fill="none" stroke="#22d3ee" strokeWidth="0.4" opacity="0.5">
+                      <animate attributeName="opacity" values="0.5;0.1;0.5" dur="1.5s" repeatCount="indefinite" />
+                    </path>
+                    <path d={`M ${gwX - 3},${gwY - 9} Q ${gwX + 2},${gwY - 16} ${gwX + 7},${gwY - 9}`} fill="none" stroke="#22d3ee" strokeWidth="0.3" opacity="0.3">
+                      <animate attributeName="opacity" values="0.3;0.05;0.3" dur="1.5s" repeatCount="indefinite" begin="0.3s" />
+                    </path>
+                  </g>
+                )}
               </g>
             );
           })()}
@@ -458,14 +506,28 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
             <span className="text-green-400">FTF</span><span>{ftf.toFixed(2)} Hz</span>
           </div>
         </div>
-        {/* Vibration charts — right side */}
+        {/* Vibration charts — cloud dashboard */}
         <div className="absolute top-0 right-1 bottom-0 w-[620px] max-w-[52%] flex flex-col justify-center opacity-95">
-          {/* Sensor connection indicator */}
-          <div className="flex items-center gap-1.5 mb-1.5 px-1">
-            <div className={`w-2 h-2 rounded-full ${isPlaying && rpm > 0 ? "bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.7)]" : "bg-gray-600"}`} />
-            <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider">
-              {isPlaying && rpm > 0 ? "Accelerometer — Live" : "Accelerometer — Idle"}
-            </span>
+          {/* Cloud header */}
+          <div className="flex items-center gap-2 mb-1 px-1">
+            <div className="flex items-center gap-1.5">
+              <div className={`w-2 h-2 rounded-full ${isPlaying && rpm > 0 ? "bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.7)]" : "bg-gray-600"}`} />
+              <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider">
+                {isPlaying && rpm > 0 ? "Accelerometer — Live" : "Accelerometer — Idle"}
+              </span>
+            </div>
+            <span className="text-[9px] text-gray-500 mx-1">→</span>
+            <div className="flex items-center gap-1 bg-slate-800/60 border border-slate-600/40 rounded px-2 py-0.5">
+              <svg width="12" height="9" viewBox="0 0 16 11" className="opacity-70">
+                <path d="M13 6.5a2.5 2.5 0 0 0-2.4-2.5 4 4 0 0 0-7.7 1A3 3 0 0 0 3 11h10a2.5 2.5 0 0 0 0-5z" fill="none" stroke="#60a5fa" strokeWidth="1.2" />
+              </svg>
+              <span className="text-[10px] font-mono text-blue-400 uppercase tracking-wider">
+                Cloud Analytics
+              </span>
+              {isPlaying && rpm > 0 && (
+                <span className="text-[8px] text-emerald-400 animate-pulse">● LIVE</span>
+              )}
+            </div>
           </div>
           <VibrationChart rpm={rpm} isPlaying={isPlaying} loadForce={loadForce} greaseLevel={greaseLevel} damage={damage} />
         </div>
