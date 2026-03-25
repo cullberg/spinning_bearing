@@ -112,7 +112,9 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
         const positions = [];
         for (let i = 0; i < visibleCount; i++) {
           const p = particles[i];
-          p.angle += sign * (rpm / 60) * Math.PI * 2 * 0.35 * p.speed * delta;
+          if (isPlaying) {
+            p.angle += sign * (rpm / 60) * Math.PI * 2 * 0.35 * p.speed * delta;
+          }
           const wobble = Math.sin(p.angle * 3 + i) * 1.5;
           const r = p.r + wobble;
           positions.push({

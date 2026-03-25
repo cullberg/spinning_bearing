@@ -88,7 +88,7 @@
 
 ## 4. Visualization
 
-```mermaid
+```merid
 erDiagram
     bearing_specs {
         string id PK "UUID"
