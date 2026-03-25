@@ -2,33 +2,21 @@
 
 Interactive 6205 ball bearing simulation with load deflection, housing, and grease pump visualization.
 
-## Quick Start (static build)
+## Quick Start
 
-The `build/client/` directory contains the pre-built SPA with a static `index.html`.
-
-### Python (no install needed)
-
-```bash
-cd services/react-web-app/build/client
-python3 -m http.server 3000
-```
-
-Open http://localhost:3000
-
-### Node.js (with the included server)
+Requires [Node.js](https://nodejs.org/) (v18+). From the repo root:
 
 ```bash
 cd services/react-web-app
-node serve.js
+npm install        # install dependencies (first time only)
+node serve.js      # start the server
 ```
 
-Open http://localhost:3000 (override with `PORT=8080 node serve.js`)
+Open http://localhost:3000 (override with `PORT=8080 node serve.js`).
 
-### npx (one-liner)
+## Why not a simple static server?
 
-```bash
-npx serve services/react-web-app/build/client
-```
+React Router v7 requires the **server bundle** to generate the initial HTML shell (even in SPA mode). A plain `python3 -m http.server` won't work. The included `serve.js` uses `@react-router/node` to handle this.
 
 ## Development (with hot reload)
 
@@ -42,5 +30,5 @@ bun run dev
 
 ## Notes
 
-- The app is a client-side SPA — no backend required.
-- ES modules need an HTTP server; opening `index.html` via `file://` won't work due to browser CORS restrictions.
+- The app is a client-side SPA — no backend API required.
+- All rendering happens in the browser after the initial shell loads.
