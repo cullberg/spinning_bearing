@@ -1,0 +1,45 @@
+{
+  "_chunk-B7RQU5TL-WGoqqZ8d.js": {
+    "file": "assets/chunk-B7RQU5TL-WGoqqZ8d.js",
+    "name": "chunk-B7RQU5TL"
+  },
+  "_index-ANSrf5OS.js": {
+    "file": "assets/index-ANSrf5OS.js",
+    "name": "index",
+    "imports": [
+      "_chunk-B7RQU5TL-WGoqqZ8d.js"
+    ]
+  },
+  "app/entry.client.tsx": {
+    "file": "assets/entry.client-CftM3kWu.js",
+    "name": "entry.client",
+    "src": "app/entry.client.tsx",
+    "isEntry": true,
+    "imports": [
+      "_chunk-B7RQU5TL-WGoqqZ8d.js",
+      "_index-ANSrf5OS.js"
+    ]
+  },
+  "app/root.tsx?__react-router-build-client-route": {
+    "file": "assets/root-DNu5IcoK.js",
+    "name": "root",
+    "src": "app/root.tsx?__react-router-build-client-route",
+    "isEntry": true,
+    "imports": [
+      "_chunk-B7RQU5TL-WGoqqZ8d.js"
+    ],
+    "css": [
+      "assets/root-Rl0c3Q12.css"
+    ]
+  },
+  "app/routes/home.tsx?__react-router-build-client-route": {
+    "file": "assets/home-CX06NDGy.js",
+    "name": "home",
+    "src": "app/routes/home.tsx?__react-router-build-client-route",
+    "isEntry": true,
+    "imports": [
+      "_chunk-B7RQU5TL-WGoqqZ8d.js",
+      "_index-ANSrf5OS.js"
+    ]
+  }
+}
