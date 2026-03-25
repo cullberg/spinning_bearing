@@ -12,6 +12,9 @@ interface ControlPanelProps {
   isPlaying: boolean;
   setIsPlaying: (playing: boolean) => void;
   onReset: () => void;
+  /** Radial load in kN */
+  loadForce: number;
+  setLoadForce: (force: number) => void;
 }
 
 export default function ControlPanel({
@@ -22,6 +25,8 @@ export default function ControlPanel({
   isPlaying,
   setIsPlaying,
   onReset,
+  loadForce,
+  setLoadForce,
 }: ControlPanelProps) {
   return (
     <Card className="w-72">
@@ -77,6 +82,36 @@ export default function ControlPanel({
               ↺ CCW
             </Button>
           </div>
+        </div>
+
+        <Separator />
+
+        {/* Radial Load */}
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Radial Load</span>
+            <span className="font-mono font-medium">{loadForce.toFixed(1)} kN</span>
+          </div>
+          <Slider
+            value={[loadForce]}
+            onValueChange={([v]) => setLoadForce(v)}
+            min={0}
+            max={5}
+            step={0.1}
+          />
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>0</span>
+            <span>5 kN</span>
+          </div>
+          {loadForce > 0 && (
+            <div className="text-xs text-muted-foreground">
+              Deflection:{" "}
+              <span className="font-mono text-foreground">
+                {(loadForce * 13).toFixed(1)} µm
+              </span>
+              <span className="ml-1">(exaggerated in view)</span>
+            </div>
+          )}
         </div>
 
         <Separator />

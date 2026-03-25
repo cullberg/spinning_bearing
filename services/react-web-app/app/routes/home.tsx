@@ -15,6 +15,7 @@ export default function Home() {
   const [rpm, setRpm] = useState(0.1);
   const [direction, setDirection] = useState<"cw" | "ccw">("cw");
   const [isPlaying, setIsPlaying] = useState(true);
+  const [loadForce, setLoadForce] = useState(1.0);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -25,6 +26,7 @@ export default function Home() {
     setIsPlaying(true);
     setRpm(0.1);
     setDirection("cw");
+    setLoadForce(0);
   };
 
   return (
@@ -43,7 +45,7 @@ export default function Home() {
         {/* 3D viewport */}
         <div className="flex-1 bg-[#12121f]">
           {isClient ? (
-            <BearingScene rpm={rpm} direction={direction} isPlaying={isPlaying} />
+            <BearingScene rpm={rpm} direction={direction} isPlaying={isPlaying} loadForce={loadForce} />
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground">
               Loading 3D scene…
@@ -61,6 +63,8 @@ export default function Home() {
             isPlaying={isPlaying}
             setIsPlaying={setIsPlaying}
             onReset={handleReset}
+            loadForce={loadForce}
+            setLoadForce={setLoadForce}
           />
         </div>
       </div>
