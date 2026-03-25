@@ -15,6 +15,9 @@ interface ControlPanelProps {
   /** Radial load in kN */
   loadForce: number;
   setLoadForce: (force: number) => void;
+  /** Show bearing housing */
+  showHousing: boolean;
+  setShowHousing: (show: boolean) => void;
 }
 
 export default function ControlPanel({
@@ -27,6 +30,8 @@ export default function ControlPanel({
   onReset,
   loadForce,
   setLoadForce,
+  showHousing,
+  setShowHousing,
 }: ControlPanelProps) {
   return (
     <Card className="w-72">
@@ -127,6 +132,20 @@ export default function ControlPanel({
           </Button>
           <Button variant="outline" onClick={onReset}>
             Reset
+          </Button>
+        </div>
+
+        <Separator />
+
+        {/* Housing */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">Housing</span>
+          <Button
+            variant={showHousing ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowHousing(!showHousing)}
+          >
+            {showHousing ? "Visible" : "Hidden"}
           </Button>
         </div>
 
