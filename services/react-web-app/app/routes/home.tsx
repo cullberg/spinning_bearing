@@ -17,6 +17,7 @@ export default function Home() {
   const [isPlaying, setIsPlaying] = useState(true);
   const [loadForce, setLoadForce] = useState(1.0);
   const [showHousing, setShowHousing] = useState(false);
+  const [greaseActive, setGreaseActive] = useState(false);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export default function Home() {
     setDirection("cw");
     setLoadForce(0);
     setShowHousing(false);
+    setGreaseActive(false);
   };
 
   return (
@@ -47,7 +49,7 @@ export default function Home() {
         {/* 3D viewport */}
         <div className="flex-1 bg-[#12121f]">
           {isClient ? (
-            <BearingScene rpm={rpm} direction={direction} isPlaying={isPlaying} loadForce={loadForce} showHousing={showHousing} />
+            <BearingScene rpm={rpm} direction={direction} isPlaying={isPlaying} loadForce={loadForce} showHousing={showHousing} greaseActive={greaseActive} />
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground">
               Loading 3D scene…
@@ -69,6 +71,8 @@ export default function Home() {
             setLoadForce={setLoadForce}
             showHousing={showHousing}
             setShowHousing={setShowHousing}
+            greaseActive={greaseActive}
+            setGreaseActive={setGreaseActive}
           />
         </div>
       </div>

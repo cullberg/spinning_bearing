@@ -8,9 +8,11 @@ interface BearingSceneProps {
   loadForce?: number;
   /** Show bearing housing around outer ring */
   showHousing?: boolean;
+  /** Apply grease via nipple (requires housing) */
+  greaseActive?: boolean;
 }
 
-export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = false }: BearingSceneProps) {
+export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = false, greaseActive = false }: BearingSceneProps) {
   const ringDuration = useMemo(() => {
     if (!isPlaying || rpm <= 0) return "0s";
     const r = Math.max(0.1, rpm);
@@ -54,6 +56,22 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
     }),
   );
 
+  // Grease particles — orbit the ball track at varying radii
+  const GREASE_COUNT = 24;
+  const GREASE_ORBIT_MIN = 30;
+  const GREASE_ORBIT_MAX = 40;
+  const greaseParticlesRef = useRef(
+    Array.from({ length: GREASE_COUNT }, (_, i) => ({
+      angle: (i / GREASE_COUNT) * Math.PI * 2,
+      r: GREASE_ORBIT_MIN + Math.random() * (GREASE_ORBIT_MAX - GREASE_ORBIT_MIN),
+      size: 1.2 + Math.random() * 1.8,
+      speed: 0.7 + Math.random() * 0.6,
+      opacity: 0.4 + Math.random() * 0.4,
+    })),
+  );
+  const [greasePositions, setGreasePositions] = useState<{ x: number; y: number; size: number; opacity: number }[]>([]);
+  const greaseAmountRef = useRef(0);
+
   const animateBalls = useCallback(
     (time: number) => {
       if (!lastTimeRef.current) lastTimeRef.current = time;
@@ -77,8 +95,39 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
           }),
         );
       }
+
+      // Grease amount ramp
+      if (greaseActive && showHousing) {
+        greaseAmountRef.current = Math.min(greaseAmountRef.current + 0.02, 1);
+      } else {
+        greaseAmountRef.current = Math.max(greaseAmountRef.current - 0.01, 0);
+      }
+
+      // Grease particle positions
+      const amount = greaseAmountRef.current;
+      if (amount <= 0) {
+        setGreasePositions([]);
+      } else {
+        const visibleCount = Math.floor(GREASE_COUNT * amount);
+        const sign = direction === "cw" ? 1 : -1;
+        const particles = greaseParticlesRef.current;
+        const positions = [];
+        for (let i = 0; i < visibleCount; i++) {
+          const p = particles[i];
+          p.angle += sign * (rpm / 60) * Math.PI * 2 * 0.35 * p.speed * delta;
+          const wobble = Math.sin(p.angle * 3 + i) * 1.5;
+          const r = p.r + wobble;
+          positions.push({
+            x: 50 + Math.cos(p.angle) * r,
+            y: 50 + Math.sin(p.angle) * r,
+            size: p.size,
+            opacity: p.opacity * amount,
+          });
+        }
+        setGreasePositions(positions);
+      }
     },
-    [isPlaying, rpm, direction],
+    [isPlaying, rpm, direction, greaseActive, showHousing],
   );
 
   useEffect(() => {
@@ -112,18 +161,40 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
 
       <div className="absolute inset-0 grid place-items-center">
         <svg viewBox="-10 -50 120 160" className="w-[min(70vh,70vw)] h-[min(70vh,70vw)] max-w-[640px] max-h-[640px]">
-          {/* Housing — solid block surrounding bearing, deflects under load */}
-          {showHousing && (
-            <g transform={`translate(0, ${deflectY * 0.8})`}>
-              <rect x="-8" y="-8" width="116" height={116 + deflectY * 1.2} rx="6" fill="#1e2a3a" stroke="#3a4f6a" strokeWidth="2" />
-              <rect x="-2" y="-2" width="104" height={104 + deflectY * 1.0} rx="3" fill="#162030" stroke="#2a3f5a" strokeWidth="1" />
-              {/* Mounting bolt holes */}
-              <circle cx="6" cy="6" r="3" fill="#0e1620" stroke="#3a4f6a" strokeWidth="0.8" />
-              <circle cx="94" cy="6" r="3" fill="#0e1620" stroke="#3a4f6a" strokeWidth="0.8" />
-              <circle cx="6" cy={94 + deflectY * 1.2} r="3" fill="#0e1620" stroke="#3a4f6a" strokeWidth="0.8" />
-              <circle cx="94" cy={94 + deflectY * 1.2} r="3" fill="#0e1620" stroke="#3a4f6a" strokeWidth="0.8" />
-            </g>
-          )}
+          {/* Housing — bends under load with curved sides */}
+          {showHousing && (() => {
+            const bow = deflectY * 2.5; // how much the sides bow outward
+            const sag = deflectY * 1.5; // how much the bottom sags down
+            // Outer housing path: top is flat, sides bow out, bottom sags
+            const outerPath = `
+              M -8,-8
+              L 108,-8
+              C ${108 + bow * 0.3},${40 + sag * 0.3} ${108 + bow * 0.3},${60 + sag * 0.5} 108,${108 + sag}
+              Q 50,${108 + sag * 1.4} -8,${108 + sag}
+              C ${-8 - bow * 0.3},${60 + sag * 0.5} ${-8 - bow * 0.3},${40 + sag * 0.3} -8,-8
+              Z
+            `;
+            // Inner housing path
+            const innerPath = `
+              M -2,-2
+              L 102,-2
+              C ${102 + bow * 0.2},${38 + sag * 0.2} ${102 + bow * 0.2},${62 + sag * 0.4} 102,${102 + sag * 0.8}
+              Q 50,${102 + sag * 1.2} -2,${102 + sag * 0.8}
+              C ${-2 - bow * 0.2},${62 + sag * 0.4} ${-2 - bow * 0.2},${38 + sag * 0.2} -2,-2
+              Z
+            `;
+            return (
+              <g>
+                <path d={outerPath} fill="#1e2a3a" stroke="#3a4f6a" strokeWidth="2" />
+                <path d={innerPath} fill="#162030" stroke="#2a3f5a" strokeWidth="1" />
+                {/* Mounting bolt holes — top stays fixed, bottom follows sag */}
+                <circle cx="6" cy="6" r="3" fill="#0e1620" stroke="#3a4f6a" strokeWidth="0.8" />
+                <circle cx="94" cy="6" r="3" fill="#0e1620" stroke="#3a4f6a" strokeWidth="0.8" />
+                <circle cx="6" cy={94 + sag * 0.9} r="3" fill="#0e1620" stroke="#3a4f6a" strokeWidth="0.8" />
+                <circle cx="94" cy={94 + sag * 0.9} r="3" fill="#0e1620" stroke="#3a4f6a" strokeWidth="0.8" />
+              </g>
+            );
+          })()}
 
           {/* Outer ring — ovalizes under radial load, shifts with housing */}
           <g transform={showHousing ? `translate(0, ${deflectY * 0.8})` : undefined}>
@@ -160,6 +231,40 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
             ))}
           </g>
 
+          {/* Grease particles — flow around the ball track */}
+          {greasePositions.length > 0 && (
+            <g transform={`translate(0, ${deflectY})`}>
+              {greasePositions.map((g, i) => (
+                <circle
+                  key={i}
+                  cx={g.x}
+                  cy={g.y}
+                  r={g.size}
+                  fill="#c4a832"
+                  opacity={g.opacity}
+                />
+              ))}
+            </g>
+          )}
+
+          {/* Grease nipple — on top of housing */}
+          {showHousing && (
+            <g>
+              {/* Nipple body */}
+              <rect x="93" y="-4" width="8" height="12" rx="2" fill={greaseActive ? "#8b7a2a" : "#4a4a5a"} stroke="#6a6a7a" strokeWidth="0.8" />
+              {/* Nipple tip */}
+              <circle cx="97" cy="-4" r="2.5" fill={greaseActive ? "#c4a832" : "#5a5a6a"} stroke="#7a7a8a" strokeWidth="0.6" />
+              {/* Grease flow indicator */}
+              {greaseActive && (
+                <>
+                  <circle cx="97" cy="2" r="1.2" fill="#c4a832" opacity="0.8" />
+                  <circle cx="95" cy="5" r="0.8" fill="#c4a832" opacity="0.6" />
+                  <circle cx="99" cy="5" r="0.8" fill="#c4a832" opacity="0.6" />
+                </>
+              )}
+            </g>
+          )}
+
           {/* Inner ring — shifts with deflection */}
           <g transform={`translate(0, ${deflectY * 0.5})`}>
             <g
@@ -182,9 +287,9 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
             <g>
               {showHousing ? (
                 <>
-                  <line x1="50" y1={-12 + deflectY * 0.8} x2="50" y2={-12 - loadForce * 8 + deflectY * 0.8} stroke="#ff4444" strokeWidth="2.5" />
-                  <polygon points={`46,${-12 + deflectY * 0.8} 54,${-12 + deflectY * 0.8} 50,${-5 + deflectY * 0.8}`} fill="#ff4444" />
-                  <text x="56" y={-12 - loadForce * 4 + deflectY * 0.8} fill="#ff6666" fontSize="4.5" fontWeight="bold" fontFamily="monospace">
+                  <line x1="50" y1={-12} x2="50" y2={-12 - loadForce * 8} stroke="#ff4444" strokeWidth="2.5" />
+                  <polygon points={`46,-12 54,-12 50,-5`} fill="#ff4444" />
+                  <text x="56" y={-12 - loadForce * 4} fill="#ff6666" fontSize="4.5" fontWeight="bold" fontFamily="monospace">
                     {loadForce.toFixed(1)} kN ↓
                   </text>
                 </>

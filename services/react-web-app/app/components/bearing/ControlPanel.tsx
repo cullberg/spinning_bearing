@@ -18,6 +18,9 @@ interface ControlPanelProps {
   /** Show bearing housing */
   showHousing: boolean;
   setShowHousing: (show: boolean) => void;
+  /** Apply grease via nipple */
+  greaseActive: boolean;
+  setGreaseActive: (active: boolean) => void;
 }
 
 export default function ControlPanel({
@@ -32,6 +35,8 @@ export default function ControlPanel({
   setLoadForce,
   showHousing,
   setShowHousing,
+  greaseActive,
+  setGreaseActive,
 }: ControlPanelProps) {
   return (
     <Card className="w-72">
@@ -148,6 +153,21 @@ export default function ControlPanel({
             {showHousing ? "Visible" : "Hidden"}
           </Button>
         </div>
+
+        {/* Grease — only available with housing */}
+        {showHousing && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Grease</span>
+            <Button
+              variant={greaseActive ? "default" : "outline"}
+              size="sm"
+              onClick={() => setGreaseActive(!greaseActive)}
+              className={greaseActive ? "bg-yellow-700 hover:bg-yellow-800" : ""}
+            >
+              {greaseActive ? "🟡 Pumping" : "Apply"}
+            </Button>
+          </div>
+        )}
 
         <Separator />
 
