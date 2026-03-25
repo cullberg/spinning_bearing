@@ -166,6 +166,20 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
     return () => cancelAnimationFrame(frameId);
   }, [animateBalls]);
 
+  // 6205 bearing geometry
+  const BALL_DIAMETER = 7.938; // mm
+  const PITCH_DIAMETER = 38.5; // mm
+  const CONTACT_ANGLE = 0; // degrees (deep groove)
+  const bdPd = BALL_DIAMETER / PITCH_DIAMETER; // ≈ 0.2062
+  const cosAlpha = Math.cos((CONTACT_ANGLE * Math.PI) / 180);
+
+  // Characteristic defect frequencies (multiples of shaft frequency)
+  const shaftFreq = rpm / 60; // Hz
+  const bpfo = (BALL_COUNT / 2) * shaftFreq * (1 - bdPd * cosAlpha);
+  const bpfi = (BALL_COUNT / 2) * shaftFreq * (1 + bdPd * cosAlpha);
+  const bsf = (PITCH_DIAMETER / (2 * BALL_DIAMETER)) * shaftFreq * (1 - (bdPd * cosAlpha) ** 2);
+  const ftf = (shaftFreq / 2) * (1 - bdPd * cosAlpha);
+
   // Per-ball deformation — loaded zone is at 6 o'clock (bottom), ~4 to 8.
   // In SVG coords: sin(a) = +1 at 6 o'clock (bottom), 0 at 3/9, -1 at 12.
   // sin(a) > 0.3 covers roughly 4 o'clock to 8 o'clock.
@@ -348,6 +362,17 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
             </g>
           )}
         </svg>
+        {/* Bearing parameters overlay */}
+        <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm rounded px-3 py-2 text-[11px] font-mono text-gray-300 leading-relaxed select-none">
+          <div className="text-gray-400 font-semibold mb-1 text-[10px] tracking-wider uppercase">6205 — {BALL_COUNT} balls · Ø{BALL_DIAMETER} mm · PCD {PITCH_DIAMETER} mm</div>
+          <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+            <span className="text-gray-500">Shaft</span><span>{shaftFreq.toFixed(2)} Hz ({rpm.toFixed(0)} RPM)</span>
+            <span className="text-blue-400">BPFO</span><span>{bpfo.toFixed(2)} Hz</span>
+            <span className="text-red-400">BPFI</span><span>{bpfi.toFixed(2)} Hz</span>
+            <span className="text-yellow-400">BSF</span><span>{bsf.toFixed(2)} Hz</span>
+            <span className="text-green-400">FTF</span><span>{ftf.toFixed(2)} Hz</span>
+          </div>
+        </div>
       </div>
     </div>
   );

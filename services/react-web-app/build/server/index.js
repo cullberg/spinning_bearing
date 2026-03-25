@@ -620,6 +620,16 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
     frameId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frameId);
   }, [animateBalls]);
+  const BALL_DIAMETER = 7.938;
+  const PITCH_DIAMETER = 38.5;
+  const CONTACT_ANGLE = 0;
+  const bdPd = BALL_DIAMETER / PITCH_DIAMETER;
+  const cosAlpha = Math.cos(CONTACT_ANGLE * Math.PI / 180);
+  const shaftFreq = rpm / 60;
+  const bpfo = BALL_COUNT / 2 * shaftFreq * (1 - bdPd * cosAlpha);
+  const bpfi = BALL_COUNT / 2 * shaftFreq * (1 + bdPd * cosAlpha);
+  const bsf = PITCH_DIAMETER / (2 * BALL_DIAMETER) * shaftFreq * (1 - (bdPd * cosAlpha) ** 2);
+  const ftf = shaftFreq / 2 * (1 - bdPd * cosAlpha);
   const ballShapes = useMemo(() => {
     return ballPositions.map((b, i) => {
       const bottomProximity = Math.sin(b.a);
@@ -635,125 +645,167 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
     /* @__PURE__ */ jsx("style", { children: `
         @keyframes bearingSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       ` }),
-    /* @__PURE__ */ jsx("div", { className: "absolute inset-0 grid place-items-center", children: /* @__PURE__ */ jsxs("svg", { viewBox: "-10 -50 120 160", className: "w-[min(70vh,70vw)] h-[min(70vh,70vw)] max-w-[640px] max-h-[640px]", children: [
-      showHousing && (() => {
-        const sag = deflectY * 1.2;
-        const outerPath = `
+    /* @__PURE__ */ jsxs("div", { className: "absolute inset-0 grid place-items-center", children: [
+      /* @__PURE__ */ jsxs("svg", { viewBox: "-10 -50 120 160", className: "w-[min(70vh,70vw)] h-[min(70vh,70vw)] max-w-[640px] max-h-[640px]", children: [
+        showHousing && (() => {
+          const sag = deflectY * 1.2;
+          const outerPath = `
               M -8,-8
               L 108,-8
               L 108,${108 + sag}
               Q 50,${108 + sag * 1.3} -8,${108 + sag}
               Z
             `;
-        const innerPath = `
+          const innerPath = `
               M -2,-2
               L 102,-2
               L 102,${102 + sag * 0.7}
               Q 50,${102 + sag * 1} -2,${102 + sag * 0.7}
               Z
             `;
-        return /* @__PURE__ */ jsxs("g", { children: [
-          /* @__PURE__ */ jsx("path", { d: outerPath, fill: "#1e2a3a", stroke: "#3a4f6a", strokeWidth: "2" }),
-          /* @__PURE__ */ jsx("path", { d: innerPath, fill: "#162030", stroke: "#2a3f5a", strokeWidth: "1" }),
-          /* @__PURE__ */ jsx("circle", { cx: "6", cy: "6", r: "3", fill: "#0e1620", stroke: "#3a4f6a", strokeWidth: "0.8" }),
-          /* @__PURE__ */ jsx("circle", { cx: "94", cy: "6", r: "3", fill: "#0e1620", stroke: "#3a4f6a", strokeWidth: "0.8" }),
-          /* @__PURE__ */ jsx("circle", { cx: "6", cy: 94 + sag * 0.8, r: "3", fill: "#0e1620", stroke: "#3a4f6a", strokeWidth: "0.8" }),
-          /* @__PURE__ */ jsx("circle", { cx: "94", cy: 94 + sag * 0.8, r: "3", fill: "#0e1620", stroke: "#3a4f6a", strokeWidth: "0.8" })
-        ] });
-      })(),
-      /* @__PURE__ */ jsxs("g", { children: [
-        /* @__PURE__ */ jsx("ellipse", { cx: "50", cy: "50", rx: outerRx, ry: outerRy, fill: showHousing ? "#1a2840" : "none", stroke: "#5f7c9f", strokeWidth: "4" }),
-        /* @__PURE__ */ jsx("ellipse", { cx: "50", cy: "50", rx: outerRx2, ry: outerRy2, fill: showHousing ? "#0f1825" : "none", stroke: "#9db6cb", strokeWidth: "6" })
-      ] }),
-      /* @__PURE__ */ jsx("g", { transform: `translate(0, ${deflectY})`, children: /* @__PURE__ */ jsx(
-        "g",
-        {
-          style: {
-            transformOrigin: "50px 50px",
-            animation: isPlaying ? `bearingSpin ${ringDuration} linear infinite` : "none",
-            animationDirection: spinDirection
-          },
-          children: /* @__PURE__ */ jsx("circle", { cx: "50", cy: "50", r: "33", fill: "none", stroke: "#c9a24a", strokeWidth: "2.2" })
-        }
-      ) }),
-      /* @__PURE__ */ jsx("g", { transform: `translate(0, ${deflectY})`, children: ballShapes.map((b) => /* @__PURE__ */ jsx(
-        "ellipse",
-        {
-          cx: b.x,
-          cy: b.y,
-          rx: b.rx,
-          ry: b.ry,
-          fill: b.inLoadZone ? "#ffd6d6" : "#f4fbff",
-          stroke: b.inLoadZone ? "#e07070" : "#8ea8c5",
-          strokeWidth: "0.8"
-        },
-        b.i
-      )) }),
-      greasePositions.length > 0 && /* @__PURE__ */ jsx("g", { transform: `translate(0, ${deflectY})`, children: greasePositions.map((g, i) => /* @__PURE__ */ jsx(
-        "circle",
-        {
-          cx: g.x,
-          cy: g.y,
-          r: g.size,
-          fill: "#c4a832",
-          opacity: g.opacity
-        },
-        i
-      )) }),
-      showHousing && /* @__PURE__ */ jsxs("g", { children: [
-        /* @__PURE__ */ jsx("rect", { x: "95", y: "-2", width: "5", height: "8", rx: "1.5", fill: "#5a5a6a", stroke: "#7a7a8a", strokeWidth: "0.6" }),
-        /* @__PURE__ */ jsx("circle", { cx: "97.5", cy: "-2", r: "2", fill: "#6a6a7a", stroke: "#8a8a9a", strokeWidth: "0.5" }),
-        /* @__PURE__ */ jsx("path", { d: "M 100,2 Q 112,2 114,10 Q 116,18 114,22", fill: "none", stroke: "#444", strokeWidth: "1.8", strokeLinecap: "round" }),
-        /* @__PURE__ */ jsx("rect", { x: "108", y: "22", width: "12", height: "30", rx: "2", fill: "#3a3a4a", stroke: "#5a5a6a", strokeWidth: "0.8" }),
-        /* @__PURE__ */ jsx("rect", { x: "109.5", y: 23 + (1 - Math.max(0, 1 - greaseLevel)) * 28, width: "9", height: Math.max(0, 1 - greaseLevel) * 28, rx: "1", fill: "#c4a832", opacity: "0.6" }),
-        /* @__PURE__ */ jsx("rect", { x: "106", y: 22 - 12 + pumpStroke * 12, width: "16", height: "3", rx: "1", fill: "#6a6a7a", stroke: "#8a8a9a", strokeWidth: "0.5" }),
-        /* @__PURE__ */ jsx("rect", { x: "110", y: 22 - 16 + pumpStroke * 12, width: "8", height: "5", rx: "1.5", fill: "#888", stroke: "#aaa", strokeWidth: "0.4" }),
-        /* @__PURE__ */ jsx("rect", { x: "113", y: 22 - 12 + pumpStroke * 12, width: "2", height: 12 - pumpStroke * 10, fill: "#777" }),
-        greaseLevel > 0 && pumpStroke > 0.3 && /* @__PURE__ */ jsxs(Fragment, { children: [
-          /* @__PURE__ */ jsx("circle", { cx: "97.5", cy: "3", r: "1.2", fill: "#c4a832", opacity: "0.8" }),
-          /* @__PURE__ */ jsx("circle", { cx: "96", cy: "6", r: "0.9", fill: "#c4a832", opacity: "0.6" }),
-          /* @__PURE__ */ jsx("circle", { cx: "99", cy: "6", r: "0.9", fill: "#c4a832", opacity: "0.6" })
-        ] })
-      ] }),
-      leakDrops.length > 0 && /* @__PURE__ */ jsxs("g", { children: [
-        leakDrops.map((d, i) => /* @__PURE__ */ jsx(
+          return /* @__PURE__ */ jsxs("g", { children: [
+            /* @__PURE__ */ jsx("path", { d: outerPath, fill: "#1e2a3a", stroke: "#3a4f6a", strokeWidth: "2" }),
+            /* @__PURE__ */ jsx("path", { d: innerPath, fill: "#162030", stroke: "#2a3f5a", strokeWidth: "1" }),
+            /* @__PURE__ */ jsx("circle", { cx: "6", cy: "6", r: "3", fill: "#0e1620", stroke: "#3a4f6a", strokeWidth: "0.8" }),
+            /* @__PURE__ */ jsx("circle", { cx: "94", cy: "6", r: "3", fill: "#0e1620", stroke: "#3a4f6a", strokeWidth: "0.8" }),
+            /* @__PURE__ */ jsx("circle", { cx: "6", cy: 94 + sag * 0.8, r: "3", fill: "#0e1620", stroke: "#3a4f6a", strokeWidth: "0.8" }),
+            /* @__PURE__ */ jsx("circle", { cx: "94", cy: 94 + sag * 0.8, r: "3", fill: "#0e1620", stroke: "#3a4f6a", strokeWidth: "0.8" })
+          ] });
+        })(),
+        /* @__PURE__ */ jsxs("g", { children: [
+          /* @__PURE__ */ jsx("ellipse", { cx: "50", cy: "50", rx: outerRx, ry: outerRy, fill: showHousing ? "#1a2840" : "none", stroke: "#5f7c9f", strokeWidth: "4" }),
+          /* @__PURE__ */ jsx("ellipse", { cx: "50", cy: "50", rx: outerRx2, ry: outerRy2, fill: showHousing ? "#0f1825" : "none", stroke: "#9db6cb", strokeWidth: "6" })
+        ] }),
+        /* @__PURE__ */ jsx("g", { transform: `translate(0, ${deflectY})`, children: /* @__PURE__ */ jsx(
+          "g",
+          {
+            style: {
+              transformOrigin: "50px 50px",
+              animation: isPlaying ? `bearingSpin ${ringDuration} linear infinite` : "none",
+              animationDirection: spinDirection
+            },
+            children: /* @__PURE__ */ jsx("circle", { cx: "50", cy: "50", r: "33", fill: "none", stroke: "#c9a24a", strokeWidth: "2.2" })
+          }
+        ) }),
+        /* @__PURE__ */ jsx("g", { transform: `translate(0, ${deflectY})`, children: ballShapes.map((b) => /* @__PURE__ */ jsx(
           "ellipse",
           {
-            cx: d.x,
-            cy: d.y,
-            rx: d.size * 0.8,
-            ry: d.size * 1.3,
+            cx: b.x,
+            cy: b.y,
+            rx: b.rx,
+            ry: b.ry,
+            fill: b.inLoadZone ? "#ffd6d6" : "#f4fbff",
+            stroke: b.inLoadZone ? "#e07070" : "#8ea8c5",
+            strokeWidth: "0.8"
+          },
+          b.i
+        )) }),
+        greasePositions.length > 0 && /* @__PURE__ */ jsx("g", { transform: `translate(0, ${deflectY})`, children: greasePositions.map((g, i) => /* @__PURE__ */ jsx(
+          "circle",
+          {
+            cx: g.x,
+            cy: g.y,
+            r: g.size,
             fill: "#c4a832",
-            opacity: d.opacity
+            opacity: g.opacity
           },
           i
-        )),
-        greaseLevel > 1 && /* @__PURE__ */ jsx("ellipse", { cx: "50", cy: 116, rx: 8 + (greaseLevel - 1) * 20, ry: 1.5 + (greaseLevel - 1) * 2, fill: "#c4a832", opacity: "0.5" })
+        )) }),
+        showHousing && /* @__PURE__ */ jsxs("g", { children: [
+          /* @__PURE__ */ jsx("rect", { x: "95", y: "-2", width: "5", height: "8", rx: "1.5", fill: "#5a5a6a", stroke: "#7a7a8a", strokeWidth: "0.6" }),
+          /* @__PURE__ */ jsx("circle", { cx: "97.5", cy: "-2", r: "2", fill: "#6a6a7a", stroke: "#8a8a9a", strokeWidth: "0.5" }),
+          /* @__PURE__ */ jsx("path", { d: "M 100,2 Q 112,2 114,10 Q 116,18 114,22", fill: "none", stroke: "#444", strokeWidth: "1.8", strokeLinecap: "round" }),
+          /* @__PURE__ */ jsx("rect", { x: "108", y: "22", width: "12", height: "30", rx: "2", fill: "#3a3a4a", stroke: "#5a5a6a", strokeWidth: "0.8" }),
+          /* @__PURE__ */ jsx("rect", { x: "109.5", y: 23 + (1 - Math.max(0, 1 - greaseLevel)) * 28, width: "9", height: Math.max(0, 1 - greaseLevel) * 28, rx: "1", fill: "#c4a832", opacity: "0.6" }),
+          /* @__PURE__ */ jsx("rect", { x: "106", y: 22 - 12 + pumpStroke * 12, width: "16", height: "3", rx: "1", fill: "#6a6a7a", stroke: "#8a8a9a", strokeWidth: "0.5" }),
+          /* @__PURE__ */ jsx("rect", { x: "110", y: 22 - 16 + pumpStroke * 12, width: "8", height: "5", rx: "1.5", fill: "#888", stroke: "#aaa", strokeWidth: "0.4" }),
+          /* @__PURE__ */ jsx("rect", { x: "113", y: 22 - 12 + pumpStroke * 12, width: "2", height: 12 - pumpStroke * 10, fill: "#777" }),
+          greaseLevel > 0 && pumpStroke > 0.3 && /* @__PURE__ */ jsxs(Fragment, { children: [
+            /* @__PURE__ */ jsx("circle", { cx: "97.5", cy: "3", r: "1.2", fill: "#c4a832", opacity: "0.8" }),
+            /* @__PURE__ */ jsx("circle", { cx: "96", cy: "6", r: "0.9", fill: "#c4a832", opacity: "0.6" }),
+            /* @__PURE__ */ jsx("circle", { cx: "99", cy: "6", r: "0.9", fill: "#c4a832", opacity: "0.6" })
+          ] })
+        ] }),
+        leakDrops.length > 0 && /* @__PURE__ */ jsxs("g", { children: [
+          leakDrops.map((d, i) => /* @__PURE__ */ jsx(
+            "ellipse",
+            {
+              cx: d.x,
+              cy: d.y,
+              rx: d.size * 0.8,
+              ry: d.size * 1.3,
+              fill: "#c4a832",
+              opacity: d.opacity
+            },
+            i
+          )),
+          greaseLevel > 1 && /* @__PURE__ */ jsx("ellipse", { cx: "50", cy: 116, rx: 8 + (greaseLevel - 1) * 20, ry: 1.5 + (greaseLevel - 1) * 2, fill: "#c4a832", opacity: "0.5" })
+        ] }),
+        /* @__PURE__ */ jsx("g", { transform: `translate(0, ${deflectY})`, children: /* @__PURE__ */ jsxs(
+          "g",
+          {
+            style: {
+              transformOrigin: "50px 50px",
+              animation: isPlaying ? `bearingSpin ${cageDuration} linear infinite` : "none",
+              animationDirection: spinDirection
+            },
+            children: [
+              /* @__PURE__ */ jsx("circle", { cx: "50", cy: "50", r: "27", fill: "none", stroke: "#d7e8f8", strokeWidth: "6" }),
+              /* @__PURE__ */ jsx("circle", { cx: "50", cy: "23", r: "1.8", fill: "#ff4fd8" })
+            ]
+          }
+        ) }),
+        /* @__PURE__ */ jsx("circle", { cx: "50", cy: 50 + deflectY, r: "2", fill: "#7fe3ff" }),
+        loadForce > 0 && /* @__PURE__ */ jsxs("g", { children: [
+          /* @__PURE__ */ jsx("line", { x1: "50", y1: 50 - 25, x2: "50", y2: 50 - 25 - loadForce * 8, stroke: "#ff4444", strokeWidth: "2.5" }),
+          /* @__PURE__ */ jsx("polygon", { points: `46,${50 - 25} 54,${50 - 25} 50,${50 - 18}`, fill: "#ff4444" }),
+          /* @__PURE__ */ jsxs("text", { x: "56", y: 50 - 25 - loadForce * 4, fill: "#ff6666", fontSize: "4.5", fontWeight: "bold", fontFamily: "monospace", children: [
+            loadForce.toFixed(1),
+            " kN ↓"
+          ] })
+        ] })
       ] }),
-      /* @__PURE__ */ jsx("g", { transform: `translate(0, ${deflectY})`, children: /* @__PURE__ */ jsxs(
-        "g",
-        {
-          style: {
-            transformOrigin: "50px 50px",
-            animation: isPlaying ? `bearingSpin ${cageDuration} linear infinite` : "none",
-            animationDirection: spinDirection
-          },
-          children: [
-            /* @__PURE__ */ jsx("circle", { cx: "50", cy: "50", r: "27", fill: "none", stroke: "#d7e8f8", strokeWidth: "6" }),
-            /* @__PURE__ */ jsx("circle", { cx: "50", cy: "23", r: "1.8", fill: "#ff4fd8" })
-          ]
-        }
-      ) }),
-      /* @__PURE__ */ jsx("circle", { cx: "50", cy: 50 + deflectY, r: "2", fill: "#7fe3ff" }),
-      loadForce > 0 && /* @__PURE__ */ jsxs("g", { children: [
-        /* @__PURE__ */ jsx("line", { x1: "50", y1: 50 - 25, x2: "50", y2: 50 - 25 - loadForce * 8, stroke: "#ff4444", strokeWidth: "2.5" }),
-        /* @__PURE__ */ jsx("polygon", { points: `46,${50 - 25} 54,${50 - 25} 50,${50 - 18}`, fill: "#ff4444" }),
-        /* @__PURE__ */ jsxs("text", { x: "56", y: 50 - 25 - loadForce * 4, fill: "#ff6666", fontSize: "4.5", fontWeight: "bold", fontFamily: "monospace", children: [
-          loadForce.toFixed(1),
-          " kN ↓"
+      /* @__PURE__ */ jsxs("div", { className: "absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm rounded px-3 py-2 text-[11px] font-mono text-gray-300 leading-relaxed select-none", children: [
+        /* @__PURE__ */ jsxs("div", { className: "text-gray-400 font-semibold mb-1 text-[10px] tracking-wider uppercase", children: [
+          "6205 — ",
+          BALL_COUNT,
+          " balls · Ø",
+          BALL_DIAMETER,
+          " mm · PCD ",
+          PITCH_DIAMETER,
+          " mm"
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5", children: [
+          /* @__PURE__ */ jsx("span", { className: "text-gray-500", children: "Shaft" }),
+          /* @__PURE__ */ jsxs("span", { children: [
+            shaftFreq.toFixed(2),
+            " Hz (",
+            rpm.toFixed(0),
+            " RPM)"
+          ] }),
+          /* @__PURE__ */ jsx("span", { className: "text-blue-400", children: "BPFO" }),
+          /* @__PURE__ */ jsxs("span", { children: [
+            bpfo.toFixed(2),
+            " Hz"
+          ] }),
+          /* @__PURE__ */ jsx("span", { className: "text-red-400", children: "BPFI" }),
+          /* @__PURE__ */ jsxs("span", { children: [
+            bpfi.toFixed(2),
+            " Hz"
+          ] }),
+          /* @__PURE__ */ jsx("span", { className: "text-yellow-400", children: "BSF" }),
+          /* @__PURE__ */ jsxs("span", { children: [
+            bsf.toFixed(2),
+            " Hz"
+          ] }),
+          /* @__PURE__ */ jsx("span", { className: "text-green-400", children: "FTF" }),
+          /* @__PURE__ */ jsxs("span", { children: [
+            ftf.toFixed(2),
+            " Hz"
+          ] })
         ] })
       ] })
-    ] }) })
+    ] })
   ] });
 }
 function meta({}) {
@@ -851,7 +903,7 @@ const route1 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProper
   default: home,
   meta
 }, Symbol.toStringTag, { value: "Module" }));
-const serverManifest = { "entry": { "module": "/spinning_bearing/assets/entry.client-CftM3kWu.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": true, "module": "/spinning_bearing/assets/root-C6DR0swQ.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": ["/spinning_bearing/assets/root-QoD2F3yw.css"], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/home": { "id": "routes/home", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": false, "module": "/spinning_bearing/assets/home-CAs_BxPs.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 } }, "url": "/spinning_bearing/assets/manifest-6556283c.js", "version": "6556283c", "sri": void 0 };
+const serverManifest = { "entry": { "module": "/spinning_bearing/assets/entry.client-CftM3kWu.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": true, "module": "/spinning_bearing/assets/root-Cq8FJvyd.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": ["/spinning_bearing/assets/root-Hh2NKymc.css"], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/home": { "id": "routes/home", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": false, "module": "/spinning_bearing/assets/home-DRK-F3-X.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 } }, "url": "/spinning_bearing/assets/manifest-0f9969fc.js", "version": "0f9969fc", "sri": void 0 };
 const assetsBuildDirectory = "build/client";
 const basename = "/spinning_bearing/";
 const future = { "v8_middleware": false, "unstable_optimizeDeps": true, "unstable_splitRouteModules": false, "unstable_subResourceIntegrity": false, "unstable_viteEnvironmentApi": false };
