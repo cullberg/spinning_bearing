@@ -1,19 +1,51 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bearing Spin Lab</title>
-  <link rel="icon" href="./favicon.ico" />
-  <link rel="stylesheet" href="./assets/root-Rl0c3Q12.css" />
-</head>
-<body>
-  <div id="root"></div>
-  <script src="/assets/manifest-a4925309.js"></script>
-  <script type="module" src="/assets/entry.client-CftM3kWu.js"></script>
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="stylesheet" href="/assets/root-Rl0c3Q12.css" />
   <link rel="modulepreload" href="/assets/chunk-B7RQU5TL-WGoqqZ8d.js" />
   <link rel="modulepreload" href="/assets/index-ANSrf5OS.js" />
   <link rel="modulepreload" href="/assets/root-DNu5IcoK.js" />
   <link rel="modulepreload" href="/assets/home-CX06NDGy.js" />
+  <link rel="modulepreload" href="/assets/entry.client-CftM3kWu.js" />
+</head>
+<body>
+  <div id="root"></div>
+  <!-- React Router manifest (sets window.__reactRouterManifest) -->
+  <script src="/assets/manifest-a4925309.js"></script>
+  <!-- SPA bootstrap: set up routing context and load route modules before entry -->
+  <script type="module">
+    // Load route modules so __reactRouterRouteModules is populated
+    const manifest = window.__reactRouterManifest;
+    const routeModules = {};
+    const routeEntries = Object.entries(manifest.routes);
+    await Promise.all(
+      routeEntries.map(async ([id, route]) => {
+        const mod = await import(route.module);
+        routeModules[id] = mod;
+      })
+    );
+    window.__reactRouterRouteModules = routeModules;
+
+    // Set up the SPA context (no SSR, no server state)
+    window.__reactRouterContext = {
+      state: {
+        loaderData: {},
+        actionData: null,
+        errors: null,
+      },
+      future: { v8_middleware: false },
+      isSpaMode: true,
+      ssr: false,
+      basename: "/",
+      routeDiscovery: { mode: "initial", manifestPath: "/__manifest" },
+    };
+
+    // Now load the entry client
+    await import("/assets/entry.client-CftM3kWu.js");
+  </script>
 </body>
 </html>

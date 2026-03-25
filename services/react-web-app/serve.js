@@ -82,6 +82,13 @@ async function buildIndexHtml() {
   );
   const entryScript = entryModule ? "/" + entryModule.file : "";
 
+  // Find the React Router manifest JS file (manifest-*.js)
+  const { readdir } = await import("node:fs/promises");
+  const assetsDir = join(CLIENT_DIR, "assets");
+  const assetFiles = await readdir(assetsDir);
+  const manifestJsName = assetFiles.find((f) => f.startsWith("manifest-") && f.endsWith(".js"));
+  const manifestJsSrc = manifestJsName ? "/assets/" + manifestJsName : "";
+
   return `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -89,23 +96,29 @@ async function buildIndexHtml() {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Bearing Spin Lab</title>
     <link rel="icon" href="/favicon.ico">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap">
 ${cssLinks}
-    <script>
-      (function() {
-        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (prefersDark) document.documentElement.classList.add('dark');
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-          e.matches ? document.documentElement.classList.add('dark') : document.documentElement.classList.remove('dark');
-        });
-      })();
-    </script>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="${entryScript}"></script>
+    <script src="${manifestJsSrc}"></script>
+    <script type="module">
+      var manifest = window.__reactRouterManifest;
+      var routeModules = {};
+      var entries = Object.entries(manifest.routes);
+      await Promise.all(entries.map(async function(e) {
+        routeModules[e[0]] = await import(e[1].module);
+      }));
+      window.__reactRouterRouteModules = routeModules;
+      window.__reactRouterContext = {
+        state: { loaderData: {}, actionData: null, errors: null },
+        future: { v8_middleware: false },
+        isSpaMode: true,
+        ssr: false,
+        basename: "/",
+        routeDiscovery: { mode: "initial", manifestPath: "/__manifest" }
+      };
+      await import("${entryScript}");
+    </script>
   </body>
 </html>`;
 }

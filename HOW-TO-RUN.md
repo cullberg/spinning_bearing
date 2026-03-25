@@ -4,7 +4,7 @@ Interactive 6205 ball bearing simulation with load deflection, housing, and grea
 
 ## Quick Start (static build)
 
-The `build/client/` directory contains the pre-built SPA. Serve it with any static HTTP server:
+The `build/client/` directory contains the pre-built SPA with a static `index.html`.
 
 ### Python (no install needed)
 
@@ -27,7 +27,7 @@ Open http://localhost:3000 (override with `PORT=8080 node serve.js`)
 ### npx (one-liner)
 
 ```bash
-npx serve services/react-web-app/build/client -s
+npx serve services/react-web-app/build/client
 ```
 
 ## Development (with hot reload)
