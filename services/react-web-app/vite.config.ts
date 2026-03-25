@@ -5,6 +5,7 @@ import tsconfigPaths from "vite-tsconfig-paths";
 import path from "path";
 
 export default defineConfig({
+  base: "/spinning_bearing/",
   clearScreen: false,
   server: {
     allowedHosts: true,
