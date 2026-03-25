@@ -20,10 +20,23 @@ export default function Home() {
   const [greaseLevel, setGreaseLevel] = useState(0);
   const [pumpStroke, setPumpStroke] = useState(0);
   const [isClient, setIsClient] = useState(false);
+  const [damage, setDamage] = useState<"none" | "outer-spall" | "inner-spall" | "ball-defect">("none");
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  // Grease depletion — lubricant wears off with each revolution
+  useEffect(() => {
+    if (!isPlaying || rpm <= 0) return;
+    const id = setInterval(() => {
+      setGreaseLevel((prev) => {
+        if (prev <= 0) return 0;
+        return Math.max(0, prev - rpm * 0.00004);
+      });
+    }, 100);
+    return () => clearInterval(id);
+  }, [isPlaying, rpm]);
 
   const handleReset = () => {
     setIsPlaying(true);
@@ -33,10 +46,11 @@ export default function Home() {
     setShowHousing(false);
     setGreaseLevel(0);
     setPumpStroke(0);
+    setDamage("none");
   };
 
   const handlePump = () => {
-    setGreaseLevel((prev) => prev + 0.15);
+    setGreaseLevel((prev) => Math.min(prev + 0.15, 1.2));
     // Animate pump stroke: push down then spring back
     setPumpStroke(1);
     setTimeout(() => setPumpStroke(0.5), 100);
@@ -56,10 +70,10 @@ export default function Home() {
 
       {/* Main */}
       <div className="flex-1 flex min-h-0">
-        {/* 3D viewport */}
-        <div className="flex-1 bg-[#12121f]">
+        {/* Viewport */}
+        <div className="flex-1 bg-[#12121f] min-h-0">
           {isClient ? (
-            <BearingScene rpm={rpm} direction={direction} isPlaying={isPlaying} loadForce={loadForce} showHousing={showHousing} greaseLevel={greaseLevel} pumpStroke={pumpStroke} />
+            <BearingScene rpm={rpm} direction={direction} isPlaying={isPlaying} loadForce={loadForce} showHousing={showHousing} greaseLevel={greaseLevel} pumpStroke={pumpStroke} damage={damage} />
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground">
               Loading 3D scene…
@@ -83,6 +97,8 @@ export default function Home() {
             setShowHousing={setShowHousing}
             greaseLevel={greaseLevel}
             onPump={handlePump}
+            damage={damage}
+            setDamage={setDamage}
           />
         </div>
       </div>

@@ -88,7 +88,7 @@
 
 ## 4. Visualization
 
-```id
+`id
 erDiagram
     bearing_specs {
         string id PK "UUID"

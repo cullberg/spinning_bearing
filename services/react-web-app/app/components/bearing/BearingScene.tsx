@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import VibrationChart from "./VibrationChart";
 
 interface BearingSceneProps {
   rpm: number;
@@ -12,9 +13,11 @@ interface BearingSceneProps {
   greaseLevel?: number;
   /** Pump handle position 0-1 (animated externally) */
   pumpStroke?: number;
+  /** Bearing damage type */
+  damage?: "none" | "outer-spall" | "inner-spall" | "ball-defect";
 }
 
-export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = false, greaseLevel = 0, pumpStroke = 0 }: BearingSceneProps) {
+export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = false, greaseLevel = 0, pumpStroke = 0, damage = "none" }: BearingSceneProps) {
   const ringDuration = useMemo(() => {
     if (!isPlaying || rpm <= 0) return "0s";
     const r = Math.max(0.1, rpm);
@@ -237,6 +240,22 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
           <g>
             <ellipse cx="50" cy="50" rx={outerRx} ry={outerRy} fill={showHousing ? "#1a2840" : "none"} stroke="#5f7c9f" strokeWidth="4" />
             <ellipse cx="50" cy="50" rx={outerRx2} ry={outerRy2} fill={showHousing ? "#0f1825" : "none"} stroke="#9db6cb" strokeWidth="6" />
+            {/* Outer race spall — fixed at ~4 o'clock on the raceway */}
+            {damage === "outer-spall" && (
+              <g>
+                {/* Spall crater on inner surface of outer ring */}
+                <ellipse cx="82" cy="68" rx="5" ry="2.5" fill="#1a1a2a" stroke="#ff4444" strokeWidth="0.6" opacity="0.9" />
+                <ellipse cx="82" cy="68" rx="3.5" ry="1.5" fill="#2a0a0a" />
+                {/* Rough edges */}
+                <path d="M 78,67 Q 79,65.5 80.5,66.5 Q 82,65 83.5,66.5 Q 85,65.5 86,67" fill="none" stroke="#ff6666" strokeWidth="0.5" opacity="0.7" />
+                {/* Debris particles */}
+                <circle cx="79" cy="63" r="0.6" fill="#888" opacity="0.5" />
+                <circle cx="84" cy="64" r="0.4" fill="#888" opacity="0.4" />
+                <circle cx="81" cy="62" r="0.5" fill="#999" opacity="0.4" />
+                {/* Label */}
+                <text x="88" y="63" fill="#ff4444" fontSize="3" fontFamily="monospace" fontWeight="bold">SPALL</text>
+              </g>
+            )}
           </g>
 
           {/* Cage ring — rotates with CSS */}
@@ -255,16 +274,24 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
           {/* Rolling elements — JS-animated orbit, deformation fixed at 12 & 6 o'clock */}
           <g transform={`translate(0, ${deflectY})`}>
             {ballShapes.map((b) => (
-              <ellipse
-                key={b.i}
-                cx={b.x}
-                cy={b.y}
-                rx={b.rx}
-                ry={b.ry}
-                fill={b.inLoadZone ? "#ffd6d6" : "#f4fbff"}
-                stroke={b.inLoadZone ? "#e07070" : "#8ea8c5"}
-                strokeWidth="0.8"
-              />
+              <g key={b.i}>
+                <ellipse
+                  cx={b.x}
+                  cy={b.y}
+                  rx={b.rx}
+                  ry={b.ry}
+                  fill={b.inLoadZone ? "#ffd6d6" : "#f4fbff"}
+                  stroke={b.inLoadZone ? "#e07070" : "#8ea8c5"}
+                  strokeWidth="0.8"
+                />
+                {/* Ball defect — show pit on first ball */}
+                {damage === "ball-defect" && b.i === 0 && (
+                  <g>
+                    <ellipse cx={b.x + 1} cy={b.y - 0.5} rx="1.8" ry="1.2" fill="#2a0a0a" stroke="#ff4444" strokeWidth="0.4" />
+                    <ellipse cx={b.x + 1} cy={b.y - 0.5} rx="1" ry="0.6" fill="#1a0505" />
+                  </g>
+                )}
+              </g>
             ))}
           </g>
 
@@ -345,6 +372,15 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
             >
               <circle cx="50" cy="50" r="27" fill="none" stroke="#d7e8f8" strokeWidth="6" />
               <circle cx="50" cy="23" r="1.8" fill="#ff4fd8" />
+              {/* Inner race spall — rotates with inner ring */}
+              {damage === "inner-spall" && (
+                <g>
+                  <ellipse cx="67" cy="30" rx="4" ry="2" fill="#1a1a2a" stroke="#ff4444" strokeWidth="0.5" opacity="0.9" />
+                  <ellipse cx="67" cy="30" rx="2.5" ry="1.2" fill="#2a0a0a" />
+                  <path d="M 64,29.2 Q 65,27.8 66.5,28.8 Q 68,27.5 69.5,29" fill="none" stroke="#ff6666" strokeWidth="0.4" opacity="0.7" />
+                  <text x="64" y="27" fill="#ff4444" fontSize="2.5" fontFamily="monospace" fontWeight="bold">SPALL</text>
+                </g>
+              )}
             </g>
           </g>
 
@@ -361,6 +397,55 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
               </text>
             </g>
           )}
+
+          {/* Accelerometer sensor on housing/outer ring */}
+          {(() => {
+            // When housing is shown, mount sensor on top of housing; otherwise on outer ring
+            const sensorY = showHousing ? -14 : 14;
+            const sensorX = 80;
+            const cablePath = showHousing
+              ? `M ${sensorX + 12},${sensorY + 3.5} Q ${sensorX + 18},${sensorY + 3} ${sensorX + 22},${sensorY} Q ${sensorX + 28},${sensorY - 3} ${sensorX + 35},${sensorY - 3}`
+              : `M 92,17.5 Q 98,17.5 102,15 Q 108,12 115,12`;
+            const connX = showHousing ? sensorX + 33.5 : 113.5;
+            const connY = showHousing ? sensorY - 5 : 10;
+            const studY1 = sensorY + 7;
+            const studY2 = showHousing ? sensorY + 11 : sensorY + 11;
+            return (
+              <g>
+                {/* Sensor body */}
+                <rect x={sensorX} y={sensorY} width="12" height="8" rx="1.5" fill="#2a3a50" stroke="#4a90d9" strokeWidth="0.8" />
+                {/* Sensor label */}
+                <text x={sensorX + 6} y={sensorY + 5.5} fill="#4a90d9" fontSize="3.8" textAnchor="middle" fontFamily="monospace" fontWeight="bold">ACC</text>
+                {/* LED indicator */}
+                <circle cx={sensorX + 10} cy={sensorY + 1.8} r="0.9" fill={isPlaying && rpm > 0 ? "#22d3ee" : "#1a2a3a"} opacity={isPlaying && rpm > 0 ? 0.9 : 0.4}>
+                  {isPlaying && rpm > 0 && (
+                    <animate attributeName="opacity" values="0.9;0.3;0.9" dur="1.5s" repeatCount="indefinite" />
+                  )}
+                </circle>
+                {/* Mounting stud */}
+                <line x1={sensorX + 6} y1={studY1} x2={sensorX + 6} y2={studY2} stroke="#4a6a8a" strokeWidth="1.8" strokeLinecap="round" />
+                {/* Cable */}
+                <path d={cablePath} fill="none" stroke="#2a5a8a" strokeWidth="1.8" strokeLinecap="round" opacity="0.6" />
+                <path d={cablePath} fill="none" stroke="#22d3ee" strokeWidth="1" opacity={isPlaying && rpm > 0 ? 0.6 : 0} />
+                {/* Animated signal pulses */}
+                {isPlaying && rpm > 0 && (
+                  <>
+                    <circle r="1.8" fill="#22d3ee" opacity="0.8">
+                      <animateMotion dur="1s" repeatCount="indefinite" path={cablePath} />
+                    </circle>
+                    <circle r="1.2" fill="#22d3ee" opacity="0.5">
+                      <animateMotion dur="1s" repeatCount="indefinite" begin="0.33s" path={cablePath} />
+                    </circle>
+                    <circle r="0.8" fill="#22d3ee" opacity="0.3">
+                      <animateMotion dur="1s" repeatCount="indefinite" begin="0.66s" path={cablePath} />
+                    </circle>
+                  </>
+                )}
+                {/* Connector */}
+                <rect x={connX} y={connY} width="3" height="4" rx="0.8" fill="#2a4a6a" stroke="#4a90d9" strokeWidth="0.5" />
+              </g>
+            );
+          })()}
         </svg>
         {/* Bearing parameters overlay */}
         <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm rounded px-3 py-2 text-[11px] font-mono text-gray-300 leading-relaxed select-none">
@@ -372,6 +457,17 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
             <span className="text-yellow-400">BSF</span><span>{bsf.toFixed(2)} Hz</span>
             <span className="text-green-400">FTF</span><span>{ftf.toFixed(2)} Hz</span>
           </div>
+        </div>
+        {/* Vibration charts — right side */}
+        <div className="absolute top-0 right-1 bottom-0 w-[620px] max-w-[52%] flex flex-col justify-center opacity-95">
+          {/* Sensor connection indicator */}
+          <div className="flex items-center gap-1.5 mb-1.5 px-1">
+            <div className={`w-2 h-2 rounded-full ${isPlaying && rpm > 0 ? "bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.7)]" : "bg-gray-600"}`} />
+            <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider">
+              {isPlaying && rpm > 0 ? "Accelerometer — Live" : "Accelerometer — Idle"}
+            </span>
+          </div>
+          <VibrationChart rpm={rpm} isPlaying={isPlaying} loadForce={loadForce} greaseLevel={greaseLevel} damage={damage} />
         </div>
       </div>
     </div>

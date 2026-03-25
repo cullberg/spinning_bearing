@@ -22,6 +22,9 @@ interface ControlPanelProps {
   greaseLevel: number;
   /** Pump one stroke of grease */
   onPump: () => void;
+  /** Bearing damage type */
+  damage: "none" | "outer-spall" | "inner-spall" | "ball-defect";
+  setDamage: (d: "none" | "outer-spall" | "inner-spall" | "ball-defect") => void;
 }
 
 export default function ControlPanel({
@@ -38,7 +41,12 @@ export default function ControlPanel({
   setShowHousing,
   greaseLevel,
   onPump,
+  damage,
+  setDamage,
 }: ControlPanelProps) {
+  // Friction coefficient: 1.0 = dry, 0.1 = well-lubricated
+  const friction = greaseLevel >= 0.3 ? 0.1 : greaseLevel <= 0 ? 1.0 : 1.0 - (greaseLevel / 0.3) * 0.9;
+
   return (
     <Card className="w-72">
       <CardHeader className="pb-4">
@@ -155,9 +163,8 @@ export default function ControlPanel({
           </Button>
         </div>
 
-        {/* Grease — hand pump, only with housing */}
-        {showHousing && (
-          <div className="space-y-2">
+        {/* Grease — hand pump */}
+        <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Grease Pump</span>
               <Button
@@ -191,7 +198,76 @@ export default function ControlPanel({
               )}
             </div>
           </div>
-        )}
+
+        {/* Friction indicator — always visible */}
+        <div className="space-y-1.5">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Friction</span>
+            <span className={`font-mono font-medium ${
+              friction > 0.7 ? "text-red-500" : friction > 0.3 ? "text-yellow-500" : "text-emerald-500"
+            }`}>{(friction * 100).toFixed(0)}%</span>
+          </div>
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                friction > 0.7 ? "bg-red-500" : friction > 0.3 ? "bg-yellow-500" : "bg-emerald-500"
+              }`}
+              style={{ width: `${friction * 100}%` }}
+            />
+          </div>
+          {friction > 0.7 && (
+            <p className="text-xs text-red-500">🔥 High friction — lubricate bearing!</p>
+          )}
+          {friction > 0.3 && friction <= 0.7 && (
+            <p className="text-xs text-yellow-500">⚠ Friction rising — re-lubricate soon</p>
+          )}
+        </div>
+
+        <Separator />
+
+        {/* Damage simulation */}
+        <div className="space-y-2">
+          <span className="text-sm text-muted-foreground">Defect Simulation</span>
+          <div className="grid grid-cols-2 gap-1.5">
+            <Button
+              variant={damage === "none" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setDamage("none")}
+              className="text-xs"
+            >
+              ✓ Healthy
+            </Button>
+            <Button
+              variant={damage === "outer-spall" ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => setDamage("outer-spall")}
+              className="text-xs"
+            >
+              Outer Spall
+            </Button>
+            <Button
+              variant={damage === "inner-spall" ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => setDamage("inner-spall")}
+              className="text-xs"
+            >
+              Inner Spall
+            </Button>
+            <Button
+              variant={damage === "ball-defect" ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => setDamage("ball-defect")}
+              className="text-xs"
+            >
+              Ball Defect
+            </Button>
+          </div>
+          {damage !== "none" && (
+            <p className="text-xs text-red-500">
+              ⚠ {damage === "outer-spall" ? "Outer race spall — raised BPFO" : damage === "inner-spall" ? "Inner race spall — raised BPFI" : "Ball surface defect — raised BSF"}
+            </p>
+          )}
+        </div>
 
         <Separator />
 

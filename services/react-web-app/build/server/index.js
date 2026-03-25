@@ -2,7 +2,7 @@ import { jsx, jsxs, Fragment } from "react/jsx-runtime";
 import { ServerRouter, UNSAFE_withComponentProps, Outlet, UNSAFE_withErrorBoundaryProps, isRouteErrorResponse, Meta, Links, ScrollRestoration, Scripts } from "react-router";
 import { renderToReadableStream } from "react-dom/server.browser";
 import * as React from "react";
-import { useMemo, useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva } from "class-variance-authority";
 import { clsx } from "clsx";
@@ -329,8 +329,11 @@ function ControlPanel({
   showHousing,
   setShowHousing,
   greaseLevel,
-  onPump
+  onPump,
+  damage,
+  setDamage
 }) {
+  const friction = greaseLevel >= 0.3 ? 0.1 : greaseLevel <= 0 ? 1 : 1 - greaseLevel / 0.3 * 0.9;
   return /* @__PURE__ */ jsxs(Card, { className: "w-72", children: [
     /* @__PURE__ */ jsx(CardHeader, { className: "pb-4", children: /* @__PURE__ */ jsxs(CardTitle, { className: "flex items-center justify-between text-base", children: [
       "Controls",
@@ -445,7 +448,7 @@ function ControlPanel({
           }
         )
       ] }),
-      showHousing && /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+      /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
         /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between", children: [
           /* @__PURE__ */ jsx("span", { className: "text-sm text-muted-foreground", children: "Grease Pump" }),
           /* @__PURE__ */ jsx(
@@ -478,6 +481,74 @@ function ControlPanel({
           greaseLevel > 1 && /* @__PURE__ */ jsx("p", { className: "text-xs text-red-500", children: "💧 Overfilled — grease leaking!" })
         ] })
       ] }),
+      /* @__PURE__ */ jsxs("div", { className: "space-y-1.5", children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex justify-between text-sm", children: [
+          /* @__PURE__ */ jsx("span", { className: "text-muted-foreground", children: "Friction" }),
+          /* @__PURE__ */ jsxs("span", { className: `font-mono font-medium ${friction > 0.7 ? "text-red-500" : friction > 0.3 ? "text-yellow-500" : "text-emerald-500"}`, children: [
+            (friction * 100).toFixed(0),
+            "%"
+          ] })
+        ] }),
+        /* @__PURE__ */ jsx("div", { className: "h-2 rounded-full bg-muted overflow-hidden", children: /* @__PURE__ */ jsx(
+          "div",
+          {
+            className: `h-full rounded-full transition-all duration-500 ${friction > 0.7 ? "bg-red-500" : friction > 0.3 ? "bg-yellow-500" : "bg-emerald-500"}`,
+            style: { width: `${friction * 100}%` }
+          }
+        ) }),
+        friction > 0.7 && /* @__PURE__ */ jsx("p", { className: "text-xs text-red-500", children: "🔥 High friction — lubricate bearing!" }),
+        friction > 0.3 && friction <= 0.7 && /* @__PURE__ */ jsx("p", { className: "text-xs text-yellow-500", children: "⚠ Friction rising — re-lubricate soon" })
+      ] }),
+      /* @__PURE__ */ jsx(Separator, {}),
+      /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+        /* @__PURE__ */ jsx("span", { className: "text-sm text-muted-foreground", children: "Defect Simulation" }),
+        /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-1.5", children: [
+          /* @__PURE__ */ jsx(
+            Button,
+            {
+              variant: damage === "none" ? "default" : "outline",
+              size: "sm",
+              onClick: () => setDamage("none"),
+              className: "text-xs",
+              children: "✓ Healthy"
+            }
+          ),
+          /* @__PURE__ */ jsx(
+            Button,
+            {
+              variant: damage === "outer-spall" ? "destructive" : "outline",
+              size: "sm",
+              onClick: () => setDamage("outer-spall"),
+              className: "text-xs",
+              children: "Outer Spall"
+            }
+          ),
+          /* @__PURE__ */ jsx(
+            Button,
+            {
+              variant: damage === "inner-spall" ? "destructive" : "outline",
+              size: "sm",
+              onClick: () => setDamage("inner-spall"),
+              className: "text-xs",
+              children: "Inner Spall"
+            }
+          ),
+          /* @__PURE__ */ jsx(
+            Button,
+            {
+              variant: damage === "ball-defect" ? "destructive" : "outline",
+              size: "sm",
+              onClick: () => setDamage("ball-defect"),
+              className: "text-xs",
+              children: "Ball Defect"
+            }
+          )
+        ] }),
+        damage !== "none" && /* @__PURE__ */ jsxs("p", { className: "text-xs text-red-500", children: [
+          "⚠ ",
+          damage === "outer-spall" ? "Outer race spall — raised BPFO" : damage === "inner-spall" ? "Inner race spall — raised BPFI" : "Ball surface defect — raised BSF"
+        ] })
+      ] }),
       /* @__PURE__ */ jsx(Separator, {}),
       /* @__PURE__ */ jsxs("div", { className: "space-y-2 text-sm", children: [
         /* @__PURE__ */ jsxs("div", { className: "flex justify-between", children: [
@@ -496,7 +567,209 @@ function ControlPanel({
     ] })
   ] });
 }
-function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = false, greaseLevel = 0, pumpStroke = 0 }) {
+const BALL_COUNT = 9;
+const BALL_DIAMETER = 7.938;
+const PITCH_DIAMETER = 38.5;
+const BD_PD = BALL_DIAMETER / PITCH_DIAMETER;
+const BPFO_MULT = BALL_COUNT / 2 * (1 - BD_PD);
+const BPFI_MULT = BALL_COUNT / 2 * (1 + BD_PD);
+const BSF_MULT = PITCH_DIAMETER / (2 * BALL_DIAMETER) * (1 - BD_PD ** 2);
+const FTF_MULT = 0.5 * (1 - BD_PD);
+const W = 700;
+const H_WAVE = 240;
+const H_FFT = 280;
+const MARGIN = { left: 40, right: 14, top: 10, bottom: 20 };
+const PLOT_W = W - MARGIN.left - MARGIN.right;
+function VibrationChart({ rpm, isPlaying, loadForce, greaseLevel, damage }) {
+  const shaftFreq = rpm / 60;
+  const timeRef = useRef(0);
+  const lastTsRef = useRef(0);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    let frameId;
+    const loop = (ts) => {
+      if (!lastTsRef.current) lastTsRef.current = ts;
+      const dt = (ts - lastTsRef.current) / 1e3;
+      lastTsRef.current = ts;
+      if (isPlaying && rpm > 0) {
+        timeRef.current += dt;
+      }
+      setTick((t) => t + 1);
+      frameId = requestAnimationFrame(loop);
+    };
+    frameId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(frameId);
+  }, [isPlaying, rpm]);
+  const amps = useMemo(() => {
+    const base = Math.min(loadForce * 0.6, 1);
+    let bpfoAmp = base * 0.9 + 0.1;
+    let bpfiAmp = base * 0.7 + 0.05;
+    let bsfAmp = base * 0.4 + 0.05;
+    let ftfAmp = base * 0.2 + 0.03;
+    const shaftAmp = 0.3 + base * 0.2;
+    let noiseLevel = greaseLevel < 0.3 ? 0.15 * (1 - greaseLevel / 0.3) : 0.02;
+    const frictionMult = greaseLevel < 0.3 ? 1 + (1 - greaseLevel / 0.3) * 0.6 : 1;
+    bpfoAmp *= frictionMult;
+    bpfiAmp *= frictionMult;
+    bsfAmp *= frictionMult;
+    ftfAmp *= frictionMult;
+    if (damage === "outer-spall") {
+      bpfoAmp = Math.min(bpfoAmp * 3.5, 1);
+      noiseLevel += 0.08;
+    } else if (damage === "inner-spall") {
+      bpfiAmp = Math.min(bpfiAmp * 3.5, 1);
+      noiseLevel += 0.06;
+    } else if (damage === "ball-defect") {
+      bsfAmp = Math.min(bsfAmp * 4, 1);
+      ftfAmp = Math.min(ftfAmp * 2, 0.6);
+      noiseLevel += 0.05;
+    }
+    return { bpfoAmp, bpfiAmp, bsfAmp, ftfAmp, shaftAmp, noiseLevel };
+  }, [loadForce, greaseLevel, damage]);
+  const noiseRef = useRef([]);
+  if (noiseRef.current.length === 0) {
+    noiseRef.current = Array.from({ length: 512 }, () => (Math.random() - 0.5) * 2);
+  }
+  const waveformPath = useMemo(() => {
+    if (shaftFreq <= 0) return "";
+    const t0 = timeRef.current;
+    const duration = 3 / shaftFreq;
+    const N = 256;
+    const pts = [];
+    for (let i = 0; i < N; i++) {
+      const t = t0 + i / (N - 1) * duration;
+      const tau = Math.PI * 2;
+      let y = 0;
+      y += amps.shaftAmp * Math.sin(tau * shaftFreq * t);
+      y += amps.bpfoAmp * Math.sin(tau * shaftFreq * BPFO_MULT * t) * 0.6;
+      y += amps.bpfiAmp * Math.sin(tau * shaftFreq * BPFI_MULT * t) * 0.5;
+      y += amps.bsfAmp * Math.sin(tau * shaftFreq * BSF_MULT * t) * 0.4;
+      y += amps.ftfAmp * Math.sin(tau * shaftFreq * FTF_MULT * t) * 0.3;
+      y += amps.bpfoAmp * 0.3 * Math.sin(tau * shaftFreq * BPFO_MULT * 2 * t);
+      y += amps.bpfiAmp * 0.2 * Math.sin(tau * shaftFreq * BPFI_MULT * 2 * t);
+      if (damage === "outer-spall") {
+        const phase = shaftFreq * BPFO_MULT * t % 1;
+        if (phase < 0.08) y += amps.bpfoAmp * 1.5 * Math.exp(-phase * 40) * Math.sin(tau * shaftFreq * 12 * t);
+      } else if (damage === "inner-spall") {
+        const phase = shaftFreq * BPFI_MULT * t % 1;
+        if (phase < 0.08) y += amps.bpfiAmp * 1.5 * Math.exp(-phase * 40) * Math.sin(tau * shaftFreq * 14 * t);
+      } else if (damage === "ball-defect") {
+        const phase = shaftFreq * BSF_MULT * t % 1;
+        if (phase < 0.1) y += amps.bsfAmp * 1.8 * Math.exp(-phase * 30) * Math.sin(tau * shaftFreq * 10 * t);
+      }
+      y += amps.noiseLevel * noiseRef.current[i % noiseRef.current.length];
+      const maxAmp = amps.shaftAmp + amps.bpfoAmp * 0.6 + amps.bpfiAmp * 0.5 + amps.bsfAmp * 0.4 + amps.ftfAmp * 0.3 + amps.bpfoAmp * 0.3 + amps.bpfiAmp * 0.2 + amps.noiseLevel + 0.1;
+      const norm = y / maxAmp;
+      const plotH = H_WAVE - MARGIN.top - MARGIN.bottom;
+      const px = MARGIN.left + i / (N - 1) * PLOT_W;
+      const py = MARGIN.top + plotH / 2 - norm * plotH * 0.45;
+      pts.push(`${i === 0 ? "M" : "L"}${px.toFixed(1)},${py.toFixed(1)}`);
+    }
+    return pts.join(" ");
+  }, [shaftFreq, amps, tick]);
+  const fftData = useMemo(() => {
+    if (shaftFreq <= 0) return { peaks: [], maxFreq: 10, yTicks: [] };
+    const maxFreq = Math.max(shaftFreq * BPFI_MULT * 2.5, 10);
+    const peaks = [
+      { freq: shaftFreq, amp: amps.shaftAmp, label: "1×", color: "#9ca3af" },
+      { freq: shaftFreq * FTF_MULT, amp: amps.ftfAmp, label: "FTF", color: "#4ade80" },
+      { freq: shaftFreq * BSF_MULT, amp: amps.bsfAmp, label: "BSF", color: "#facc15" },
+      { freq: shaftFreq * BPFO_MULT, amp: amps.bpfoAmp, label: "BPFO", color: "#60a5fa" },
+      { freq: shaftFreq * BPFI_MULT, amp: amps.bpfiAmp, label: "BPFI", color: "#f87171" },
+      // Harmonics
+      { freq: shaftFreq * 2, amp: amps.shaftAmp * 0.3, label: "2×", color: "#6b7280" },
+      { freq: shaftFreq * BPFO_MULT * 2, amp: amps.bpfoAmp * 0.3, label: "2×BPFO", color: "#3b82f6" },
+      { freq: shaftFreq * BPFI_MULT * 2, amp: amps.bpfiAmp * 0.2, label: "2×BPFI", color: "#ef4444" },
+      // 3rd harmonics for damaged components
+      ...damage === "outer-spall" ? [
+        { freq: shaftFreq * BPFO_MULT * 3, amp: amps.bpfoAmp * 0.2, label: "3×BPFO", color: "#3b82f6" },
+        // Sidebands around BPFO (±1× shaft)
+        { freq: shaftFreq * BPFO_MULT - shaftFreq, amp: amps.bpfoAmp * 0.25, label: "", color: "#60a5fa" },
+        { freq: shaftFreq * BPFO_MULT + shaftFreq, amp: amps.bpfoAmp * 0.25, label: "", color: "#60a5fa" }
+      ] : [],
+      ...damage === "inner-spall" ? [
+        { freq: shaftFreq * BPFI_MULT * 3, amp: amps.bpfiAmp * 0.15, label: "3×BPFI", color: "#ef4444" },
+        // Sidebands around BPFI (±1× shaft)
+        { freq: shaftFreq * BPFI_MULT - shaftFreq, amp: amps.bpfiAmp * 0.3, label: "", color: "#f87171" },
+        { freq: shaftFreq * BPFI_MULT + shaftFreq, amp: amps.bpfiAmp * 0.3, label: "", color: "#f87171" }
+      ] : [],
+      ...damage === "ball-defect" ? [
+        { freq: shaftFreq * BSF_MULT * 2, amp: amps.bsfAmp * 0.5, label: "2×BSF", color: "#facc15" },
+        { freq: shaftFreq * BSF_MULT * 3, amp: amps.bsfAmp * 0.25, label: "3×BSF", color: "#facc15" },
+        // Cage modulation sidebands
+        { freq: shaftFreq * BSF_MULT - shaftFreq * FTF_MULT, amp: amps.bsfAmp * 0.2, label: "", color: "#facc15" },
+        { freq: shaftFreq * BSF_MULT + shaftFreq * FTF_MULT, amp: amps.bsfAmp * 0.2, label: "", color: "#facc15" }
+      ] : []
+    ].filter((p) => p.freq > 0 && p.freq < maxFreq);
+    return { peaks, maxFreq, yTicks: [] };
+  }, [shaftFreq, amps]);
+  const noiseFloorPath = useMemo(() => {
+    if (shaftFreq <= 0) return "";
+    const plotH = H_FFT - MARGIN.top - MARGIN.bottom;
+    const N = 200;
+    const pts = [];
+    for (let i = 0; i < N; i++) {
+      const px = MARGIN.left + i / (N - 1) * PLOT_W;
+      const noise = amps.noiseLevel * (0.5 + 0.5 * Math.abs(noiseRef.current[i * 2 % noiseRef.current.length]));
+      const py = MARGIN.top + plotH - noise * plotH * 0.8;
+      pts.push(`${i === 0 ? "M" : "L"}${px.toFixed(1)},${py.toFixed(1)}`);
+    }
+    return pts.join(" ");
+  }, [shaftFreq, amps]);
+  const freqTicks = useMemo(() => {
+    if (fftData.maxFreq <= 0) return [];
+    const step = fftData.maxFreq < 20 ? 2 : fftData.maxFreq < 50 ? 5 : fftData.maxFreq < 200 ? 20 : 50;
+    const ticks = [];
+    for (let f = 0; f <= fftData.maxFreq; f += step) {
+      ticks.push(f);
+    }
+    return ticks;
+  }, [fftData.maxFreq]);
+  const plotHWave = H_WAVE - MARGIN.top - MARGIN.bottom;
+  const plotHFft = H_FFT - MARGIN.top - MARGIN.bottom;
+  return /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-1.5 w-full select-none", children: [
+    /* @__PURE__ */ jsxs("div", { children: [
+      /* @__PURE__ */ jsx("div", { className: "text-[9px] font-mono text-gray-500 uppercase tracking-wider mb-0.5 px-0.5", children: "Vibration Signal" }),
+      /* @__PURE__ */ jsx("div", { className: "bg-[#0c0f1a] rounded border border-gray-800/60 overflow-hidden", children: /* @__PURE__ */ jsxs("svg", { viewBox: `0 0 ${W} ${H_WAVE}`, className: "w-full", preserveAspectRatio: "xMidYMid meet", children: [
+        /* @__PURE__ */ jsx("line", { x1: MARGIN.left, y1: MARGIN.top + plotHWave / 2, x2: W - MARGIN.right, y2: MARGIN.top + plotHWave / 2, stroke: "#1e2940", strokeWidth: "0.5" }),
+        /* @__PURE__ */ jsx("line", { x1: MARGIN.left, y1: MARGIN.top, x2: MARGIN.left, y2: MARGIN.top + plotHWave, stroke: "#1e2940", strokeWidth: "0.5" }),
+        /* @__PURE__ */ jsx("text", { x: 4, y: MARGIN.top + plotHWave / 2, fill: "#6b7280", fontSize: "8", dominantBaseline: "middle", fontFamily: "monospace", children: "Accel" }),
+        /* @__PURE__ */ jsx("text", { x: W - MARGIN.right, y: H_WAVE - 3, fill: "#6b7280", fontSize: "7", textAnchor: "end", fontFamily: "monospace", children: "Time" }),
+        waveformPath && rpm > 0 && /* @__PURE__ */ jsx("path", { d: waveformPath, fill: "none", stroke: "#22d3ee", strokeWidth: "1.2", opacity: "0.9" }),
+        rpm <= 0 && /* @__PURE__ */ jsx("text", { x: W / 2, y: H_WAVE / 2, fill: "#4b5563", fontSize: "10", textAnchor: "middle", fontFamily: "monospace", children: "No signal — set RPM > 0" })
+      ] }) })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { children: [
+      /* @__PURE__ */ jsx("div", { className: "text-[9px] font-mono text-gray-500 uppercase tracking-wider mb-0.5 px-0.5", children: "FFT Spectrum" }),
+      /* @__PURE__ */ jsx("div", { className: "bg-[#0c0f1a] rounded border border-gray-800/60 overflow-hidden", children: /* @__PURE__ */ jsxs("svg", { viewBox: `0 0 ${W} ${H_FFT}`, className: "w-full", preserveAspectRatio: "xMidYMid meet", children: [
+        /* @__PURE__ */ jsx("line", { x1: MARGIN.left, y1: MARGIN.top + plotHFft, x2: W - MARGIN.right, y2: MARGIN.top + plotHFft, stroke: "#1e2940", strokeWidth: "0.5" }),
+        /* @__PURE__ */ jsx("line", { x1: MARGIN.left, y1: MARGIN.top, x2: MARGIN.left, y2: MARGIN.top + plotHFft, stroke: "#1e2940", strokeWidth: "0.5" }),
+        freqTicks.map((f) => {
+          const x = MARGIN.left + f / fftData.maxFreq * PLOT_W;
+          return /* @__PURE__ */ jsxs("g", { children: [
+            /* @__PURE__ */ jsx("line", { x1: x, y1: MARGIN.top, x2: x, y2: MARGIN.top + plotHFft, stroke: "#1a2235", strokeWidth: "0.5" }),
+            /* @__PURE__ */ jsx("text", { x, y: H_FFT - 3, fill: "#4b5563", fontSize: "7", textAnchor: "middle", fontFamily: "monospace", children: f })
+          ] }, f);
+        }),
+        /* @__PURE__ */ jsx("text", { x: 4, y: MARGIN.top + plotHFft / 2, fill: "#6b7280", fontSize: "8", dominantBaseline: "middle", fontFamily: "monospace", children: "|FFT|" }),
+        /* @__PURE__ */ jsx("text", { x: W / 2, y: H_FFT - 3, fill: "#6b7280", fontSize: "7", textAnchor: "middle", fontFamily: "monospace", children: "Frequency (Hz)" }),
+        noiseFloorPath && /* @__PURE__ */ jsx("path", { d: noiseFloorPath, fill: "none", stroke: "#374151", strokeWidth: "0.8", opacity: "0.6" }),
+        fftData.peaks.map((p, i) => {
+          const x = MARGIN.left + p.freq / fftData.maxFreq * PLOT_W;
+          const barH = p.amp * plotHFft * 0.85;
+          const y = MARGIN.top + plotHFft - barH;
+          return /* @__PURE__ */ jsxs("g", { children: [
+            /* @__PURE__ */ jsx("line", { x1: x, y1: MARGIN.top + plotHFft, x2: x, y2: y, stroke: p.color, strokeWidth: "2", opacity: "0.85" }),
+            /* @__PURE__ */ jsx("circle", { cx: x, cy: y, r: "2", fill: p.color, opacity: "0.9" }),
+            !p.label.startsWith("2×") && /* @__PURE__ */ jsx("text", { x, y: y - 4, fill: p.color, fontSize: "6.5", textAnchor: "middle", fontFamily: "monospace", fontWeight: "bold", children: p.label })
+          ] }, i);
+        }),
+        rpm <= 0 && /* @__PURE__ */ jsx("text", { x: W / 2, y: H_FFT / 2, fill: "#4b5563", fontSize: "10", textAnchor: "middle", fontFamily: "monospace", children: "No signal" })
+      ] }) })
+    ] })
+  ] });
+}
+function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = false, greaseLevel = 0, pumpStroke = 0, damage = "none" }) {
   const ringDuration = useMemo(() => {
     if (!isPlaying || rpm <= 0) return "0s";
     const r = Math.max(0.1, rpm);
@@ -517,13 +790,13 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
   const outerRy = outerR - ovalFactor * 0.5;
   const outerRx2 = outerR2 + ovalFactor * 0.4;
   const outerRy2 = outerR2 - ovalFactor * 0.4;
-  const BALL_COUNT = 9;
+  const BALL_COUNT2 = 9;
   const BALL_ORBIT_R = 35;
   const cageAngleRef = useRef(0);
   const lastTimeRef = useRef(0);
   const [ballPositions, setBallPositions] = useState(
-    () => Array.from({ length: BALL_COUNT }, (_, i) => {
-      const a = i / BALL_COUNT * Math.PI * 2;
+    () => Array.from({ length: BALL_COUNT2 }, (_, i) => {
+      const a = i / BALL_COUNT2 * Math.PI * 2;
       return { x: 50 + Math.cos(a) * BALL_ORBIT_R, y: 50 + Math.sin(a) * BALL_ORBIT_R, a };
     })
   );
@@ -552,8 +825,8 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
         const cageW = sign * (rpm / 60) * Math.PI * 2 * 0.4;
         cageAngleRef.current += cageW * delta;
         setBallPositions(
-          Array.from({ length: BALL_COUNT }, (_, i) => {
-            const a = i / BALL_COUNT * Math.PI * 2 + cageAngleRef.current;
+          Array.from({ length: BALL_COUNT2 }, (_, i) => {
+            const a = i / BALL_COUNT2 * Math.PI * 2 + cageAngleRef.current;
             return {
               x: 50 + Math.cos(a) * BALL_ORBIT_R,
               y: 50 + Math.sin(a) * BALL_ORBIT_R,
@@ -620,15 +893,15 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
     frameId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frameId);
   }, [animateBalls]);
-  const BALL_DIAMETER = 7.938;
-  const PITCH_DIAMETER = 38.5;
+  const BALL_DIAMETER2 = 7.938;
+  const PITCH_DIAMETER2 = 38.5;
   const CONTACT_ANGLE = 0;
-  const bdPd = BALL_DIAMETER / PITCH_DIAMETER;
+  const bdPd = BALL_DIAMETER2 / PITCH_DIAMETER2;
   const cosAlpha = Math.cos(CONTACT_ANGLE * Math.PI / 180);
   const shaftFreq = rpm / 60;
-  const bpfo = BALL_COUNT / 2 * shaftFreq * (1 - bdPd * cosAlpha);
-  const bpfi = BALL_COUNT / 2 * shaftFreq * (1 + bdPd * cosAlpha);
-  const bsf = PITCH_DIAMETER / (2 * BALL_DIAMETER) * shaftFreq * (1 - (bdPd * cosAlpha) ** 2);
+  const bpfo = BALL_COUNT2 / 2 * shaftFreq * (1 - bdPd * cosAlpha);
+  const bpfi = BALL_COUNT2 / 2 * shaftFreq * (1 + bdPd * cosAlpha);
+  const bsf = PITCH_DIAMETER2 / (2 * BALL_DIAMETER2) * shaftFreq * (1 - (bdPd * cosAlpha) ** 2);
   const ftf = shaftFreq / 2 * (1 - bdPd * cosAlpha);
   const ballShapes = useMemo(() => {
     return ballPositions.map((b, i) => {
@@ -674,7 +947,16 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
         })(),
         /* @__PURE__ */ jsxs("g", { children: [
           /* @__PURE__ */ jsx("ellipse", { cx: "50", cy: "50", rx: outerRx, ry: outerRy, fill: showHousing ? "#1a2840" : "none", stroke: "#5f7c9f", strokeWidth: "4" }),
-          /* @__PURE__ */ jsx("ellipse", { cx: "50", cy: "50", rx: outerRx2, ry: outerRy2, fill: showHousing ? "#0f1825" : "none", stroke: "#9db6cb", strokeWidth: "6" })
+          /* @__PURE__ */ jsx("ellipse", { cx: "50", cy: "50", rx: outerRx2, ry: outerRy2, fill: showHousing ? "#0f1825" : "none", stroke: "#9db6cb", strokeWidth: "6" }),
+          damage === "outer-spall" && /* @__PURE__ */ jsxs("g", { children: [
+            /* @__PURE__ */ jsx("ellipse", { cx: "82", cy: "68", rx: "5", ry: "2.5", fill: "#1a1a2a", stroke: "#ff4444", strokeWidth: "0.6", opacity: "0.9" }),
+            /* @__PURE__ */ jsx("ellipse", { cx: "82", cy: "68", rx: "3.5", ry: "1.5", fill: "#2a0a0a" }),
+            /* @__PURE__ */ jsx("path", { d: "M 78,67 Q 79,65.5 80.5,66.5 Q 82,65 83.5,66.5 Q 85,65.5 86,67", fill: "none", stroke: "#ff6666", strokeWidth: "0.5", opacity: "0.7" }),
+            /* @__PURE__ */ jsx("circle", { cx: "79", cy: "63", r: "0.6", fill: "#888", opacity: "0.5" }),
+            /* @__PURE__ */ jsx("circle", { cx: "84", cy: "64", r: "0.4", fill: "#888", opacity: "0.4" }),
+            /* @__PURE__ */ jsx("circle", { cx: "81", cy: "62", r: "0.5", fill: "#999", opacity: "0.4" }),
+            /* @__PURE__ */ jsx("text", { x: "88", y: "63", fill: "#ff4444", fontSize: "3", fontFamily: "monospace", fontWeight: "bold", children: "SPALL" })
+          ] })
         ] }),
         /* @__PURE__ */ jsx("g", { transform: `translate(0, ${deflectY})`, children: /* @__PURE__ */ jsx(
           "g",
@@ -687,19 +969,24 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
             children: /* @__PURE__ */ jsx("circle", { cx: "50", cy: "50", r: "33", fill: "none", stroke: "#c9a24a", strokeWidth: "2.2" })
           }
         ) }),
-        /* @__PURE__ */ jsx("g", { transform: `translate(0, ${deflectY})`, children: ballShapes.map((b) => /* @__PURE__ */ jsx(
-          "ellipse",
-          {
-            cx: b.x,
-            cy: b.y,
-            rx: b.rx,
-            ry: b.ry,
-            fill: b.inLoadZone ? "#ffd6d6" : "#f4fbff",
-            stroke: b.inLoadZone ? "#e07070" : "#8ea8c5",
-            strokeWidth: "0.8"
-          },
-          b.i
-        )) }),
+        /* @__PURE__ */ jsx("g", { transform: `translate(0, ${deflectY})`, children: ballShapes.map((b) => /* @__PURE__ */ jsxs("g", { children: [
+          /* @__PURE__ */ jsx(
+            "ellipse",
+            {
+              cx: b.x,
+              cy: b.y,
+              rx: b.rx,
+              ry: b.ry,
+              fill: b.inLoadZone ? "#ffd6d6" : "#f4fbff",
+              stroke: b.inLoadZone ? "#e07070" : "#8ea8c5",
+              strokeWidth: "0.8"
+            }
+          ),
+          damage === "ball-defect" && b.i === 0 && /* @__PURE__ */ jsxs("g", { children: [
+            /* @__PURE__ */ jsx("ellipse", { cx: b.x + 1, cy: b.y - 0.5, rx: "1.8", ry: "1.2", fill: "#2a0a0a", stroke: "#ff4444", strokeWidth: "0.4" }),
+            /* @__PURE__ */ jsx("ellipse", { cx: b.x + 1, cy: b.y - 0.5, rx: "1", ry: "0.6", fill: "#1a0505" })
+          ] })
+        ] }, b.i)) }),
         greasePositions.length > 0 && /* @__PURE__ */ jsx("g", { transform: `translate(0, ${deflectY})`, children: greasePositions.map((g, i) => /* @__PURE__ */ jsx(
           "circle",
           {
@@ -751,7 +1038,13 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
             },
             children: [
               /* @__PURE__ */ jsx("circle", { cx: "50", cy: "50", r: "27", fill: "none", stroke: "#d7e8f8", strokeWidth: "6" }),
-              /* @__PURE__ */ jsx("circle", { cx: "50", cy: "23", r: "1.8", fill: "#ff4fd8" })
+              /* @__PURE__ */ jsx("circle", { cx: "50", cy: "23", r: "1.8", fill: "#ff4fd8" }),
+              damage === "inner-spall" && /* @__PURE__ */ jsxs("g", { children: [
+                /* @__PURE__ */ jsx("ellipse", { cx: "67", cy: "30", rx: "4", ry: "2", fill: "#1a1a2a", stroke: "#ff4444", strokeWidth: "0.5", opacity: "0.9" }),
+                /* @__PURE__ */ jsx("ellipse", { cx: "67", cy: "30", rx: "2.5", ry: "1.2", fill: "#2a0a0a" }),
+                /* @__PURE__ */ jsx("path", { d: "M 64,29.2 Q 65,27.8 66.5,28.8 Q 68,27.5 69.5,29", fill: "none", stroke: "#ff6666", strokeWidth: "0.4", opacity: "0.7" }),
+                /* @__PURE__ */ jsx("text", { x: "64", y: "27", fill: "#ff4444", fontSize: "2.5", fontFamily: "monospace", fontWeight: "bold", children: "SPALL" })
+              ] })
             ]
           }
         ) }),
@@ -763,16 +1056,39 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
             loadForce.toFixed(1),
             " kN ↓"
           ] })
-        ] })
+        ] }),
+        (() => {
+          const sensorY = showHousing ? -14 : 14;
+          const sensorX = 80;
+          const cablePath = showHousing ? `M ${sensorX + 12},${sensorY + 3.5} Q ${sensorX + 18},${sensorY + 3} ${sensorX + 22},${sensorY} Q ${sensorX + 28},${sensorY - 3} ${sensorX + 35},${sensorY - 3}` : `M 92,17.5 Q 98,17.5 102,15 Q 108,12 115,12`;
+          const connX = showHousing ? sensorX + 33.5 : 113.5;
+          const connY = showHousing ? sensorY - 5 : 10;
+          const studY1 = sensorY + 7;
+          const studY2 = showHousing ? sensorY + 11 : sensorY + 11;
+          return /* @__PURE__ */ jsxs("g", { children: [
+            /* @__PURE__ */ jsx("rect", { x: sensorX, y: sensorY, width: "12", height: "8", rx: "1.5", fill: "#2a3a50", stroke: "#4a90d9", strokeWidth: "0.8" }),
+            /* @__PURE__ */ jsx("text", { x: sensorX + 6, y: sensorY + 5.5, fill: "#4a90d9", fontSize: "3.8", textAnchor: "middle", fontFamily: "monospace", fontWeight: "bold", children: "ACC" }),
+            /* @__PURE__ */ jsx("circle", { cx: sensorX + 10, cy: sensorY + 1.8, r: "0.9", fill: isPlaying && rpm > 0 ? "#22d3ee" : "#1a2a3a", opacity: isPlaying && rpm > 0 ? 0.9 : 0.4, children: isPlaying && rpm > 0 && /* @__PURE__ */ jsx("animate", { attributeName: "opacity", values: "0.9;0.3;0.9", dur: "1.5s", repeatCount: "indefinite" }) }),
+            /* @__PURE__ */ jsx("line", { x1: sensorX + 6, y1: studY1, x2: sensorX + 6, y2: studY2, stroke: "#4a6a8a", strokeWidth: "1.8", strokeLinecap: "round" }),
+            /* @__PURE__ */ jsx("path", { d: cablePath, fill: "none", stroke: "#2a5a8a", strokeWidth: "1.8", strokeLinecap: "round", opacity: "0.6" }),
+            /* @__PURE__ */ jsx("path", { d: cablePath, fill: "none", stroke: "#22d3ee", strokeWidth: "1", opacity: isPlaying && rpm > 0 ? 0.6 : 0 }),
+            isPlaying && rpm > 0 && /* @__PURE__ */ jsxs(Fragment, { children: [
+              /* @__PURE__ */ jsx("circle", { r: "1.8", fill: "#22d3ee", opacity: "0.8", children: /* @__PURE__ */ jsx("animateMotion", { dur: "1s", repeatCount: "indefinite", path: cablePath }) }),
+              /* @__PURE__ */ jsx("circle", { r: "1.2", fill: "#22d3ee", opacity: "0.5", children: /* @__PURE__ */ jsx("animateMotion", { dur: "1s", repeatCount: "indefinite", begin: "0.33s", path: cablePath }) }),
+              /* @__PURE__ */ jsx("circle", { r: "0.8", fill: "#22d3ee", opacity: "0.3", children: /* @__PURE__ */ jsx("animateMotion", { dur: "1s", repeatCount: "indefinite", begin: "0.66s", path: cablePath }) })
+            ] }),
+            /* @__PURE__ */ jsx("rect", { x: connX, y: connY, width: "3", height: "4", rx: "0.8", fill: "#2a4a6a", stroke: "#4a90d9", strokeWidth: "0.5" })
+          ] });
+        })()
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm rounded px-3 py-2 text-[11px] font-mono text-gray-300 leading-relaxed select-none", children: [
         /* @__PURE__ */ jsxs("div", { className: "text-gray-400 font-semibold mb-1 text-[10px] tracking-wider uppercase", children: [
           "6205 — ",
-          BALL_COUNT,
+          BALL_COUNT2,
           " balls · Ø",
-          BALL_DIAMETER,
+          BALL_DIAMETER2,
           " mm · PCD ",
-          PITCH_DIAMETER,
+          PITCH_DIAMETER2,
           " mm"
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5", children: [
@@ -804,6 +1120,13 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
             " Hz"
           ] })
         ] })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "absolute top-0 right-1 bottom-0 w-[620px] max-w-[52%] flex flex-col justify-center opacity-95", children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1.5 mb-1.5 px-1", children: [
+          /* @__PURE__ */ jsx("div", { className: `w-2 h-2 rounded-full ${isPlaying && rpm > 0 ? "bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.7)]" : "bg-gray-600"}` }),
+          /* @__PURE__ */ jsx("span", { className: "text-[10px] font-mono text-gray-400 uppercase tracking-wider", children: isPlaying && rpm > 0 ? "Accelerometer — Live" : "Accelerometer — Idle" })
+        ] }),
+        /* @__PURE__ */ jsx(VibrationChart, { rpm, isPlaying, loadForce, greaseLevel, damage })
       ] })
     ] })
   ] });
@@ -825,9 +1148,20 @@ const home = UNSAFE_withComponentProps(function Home() {
   const [greaseLevel, setGreaseLevel] = useState(0);
   const [pumpStroke, setPumpStroke] = useState(0);
   const [isClient, setIsClient] = useState(false);
+  const [damage, setDamage] = useState("none");
   useEffect(() => {
     setIsClient(true);
   }, []);
+  useEffect(() => {
+    if (!isPlaying || rpm <= 0) return;
+    const id = setInterval(() => {
+      setGreaseLevel((prev) => {
+        if (prev <= 0) return 0;
+        return Math.max(0, prev - rpm * 4e-5);
+      });
+    }, 100);
+    return () => clearInterval(id);
+  }, [isPlaying, rpm]);
   const handleReset = () => {
     setIsPlaying(true);
     setRpm(0.1);
@@ -836,9 +1170,10 @@ const home = UNSAFE_withComponentProps(function Home() {
     setShowHousing(false);
     setGreaseLevel(0);
     setPumpStroke(0);
+    setDamage("none");
   };
   const handlePump = () => {
-    setGreaseLevel((prev) => prev + 0.15);
+    setGreaseLevel((prev) => Math.min(prev + 0.15, 1.2));
     setPumpStroke(1);
     setTimeout(() => setPumpStroke(0.5), 100);
     setTimeout(() => setPumpStroke(0), 250);
@@ -864,7 +1199,7 @@ const home = UNSAFE_withComponentProps(function Home() {
     }), /* @__PURE__ */ jsxs("div", {
       className: "flex-1 flex min-h-0",
       children: [/* @__PURE__ */ jsx("div", {
-        className: "flex-1 bg-[#12121f]",
+        className: "flex-1 bg-[#12121f] min-h-0",
         children: isClient ? /* @__PURE__ */ jsx(BearingScene, {
           rpm,
           direction,
@@ -872,7 +1207,8 @@ const home = UNSAFE_withComponentProps(function Home() {
           loadForce,
           showHousing,
           greaseLevel,
-          pumpStroke
+          pumpStroke,
+          damage
         }) : /* @__PURE__ */ jsx("div", {
           className: "h-full flex items-center justify-center text-muted-foreground",
           children: "Loading 3D scene…"
@@ -892,7 +1228,9 @@ const home = UNSAFE_withComponentProps(function Home() {
           showHousing,
           setShowHousing,
           greaseLevel,
-          onPump: handlePump
+          onPump: handlePump,
+          damage,
+          setDamage
         })
       })]
     })]
@@ -903,7 +1241,7 @@ const route1 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProper
   default: home,
   meta
 }, Symbol.toStringTag, { value: "Module" }));
-const serverManifest = { "entry": { "module": "/spinning_bearing/assets/entry.client-CftM3kWu.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": true, "module": "/spinning_bearing/assets/root-Cq8FJvyd.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": ["/spinning_bearing/assets/root-Hh2NKymc.css"], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/home": { "id": "routes/home", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": false, "module": "/spinning_bearing/assets/home-DRK-F3-X.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 } }, "url": "/spinning_bearing/assets/manifest-0f9969fc.js", "version": "0f9969fc", "sri": void 0 };
+const serverManifest = { "entry": { "module": "/spinning_bearing/assets/entry.client-CftM3kWu.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": true, "module": "/spinning_bearing/assets/root-G6x9zYPl.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": ["/spinning_bearing/assets/root-B1Es2ZZL.css"], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/home": { "id": "routes/home", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": false, "module": "/spinning_bearing/assets/home-sbZsHBe7.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 } }, "url": "/spinning_bearing/assets/manifest-41a05c8c.js", "version": "41a05c8c", "sri": void 0 };
 const assetsBuildDirectory = "build/client";
 const basename = "/spinning_bearing/";
 const future = { "v8_middleware": false, "unstable_optimizeDeps": true, "unstable_splitRouteModules": false, "unstable_subResourceIntegrity": false, "unstable_viteEnvironmentApi": false };
