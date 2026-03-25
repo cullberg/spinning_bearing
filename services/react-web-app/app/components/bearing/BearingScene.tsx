@@ -35,15 +35,16 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
   const maxDeflect = 3;
   const deflectY = Math.min(loadForce * 1.5, maxDeflect);
 
-  // Outer ring ovalization: under radial load the race becomes slightly elliptical
-  // — compressed vertically, expanded horizontally (exaggerated for visibility)
-  const ovalFactor = loadForce * 1.2; // SVG units of distortion per kN
+  // Load path: shaft → inner ring → balls at bottom → outer ring → housing.
+  // Outer ring receives reaction force at bottom, causing slight ovalization.
+  const ovalFactor = loadForce * 0.8; // milder than if squeezed externally
   const outerR = 47;
   const outerR2 = 41;
-  const outerRx = outerR + ovalFactor;
-  const outerRy = outerR - ovalFactor;
-  const outerRx2 = outerR2 + ovalFactor * 0.8;
-  const outerRy2 = outerR2 - ovalFactor * 0.8;
+  // Outer ring expands horizontally, compresses vertically under bottom load
+  const outerRx = outerR + ovalFactor * 0.5;
+  const outerRy = outerR - ovalFactor * 0.5;
+  const outerRx2 = outerR2 + ovalFactor * 0.4;
+  const outerRy2 = outerR2 - ovalFactor * 0.4;
 
   const BALL_COUNT = 9;
   const BALL_ORBIT_R = 35;
@@ -131,7 +132,7 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
         if (Math.random() < (greaseLevel - 0.8) * 0.3) {
           drops.push({
             x: 30 + Math.random() * 40,
-            y: 108 + deflectY * 1.5,
+            y: 108,
             vy: 2 + Math.random() * 3,
             size: 1.0 + Math.random() * 1.5 * Math.min(greaseLevel - 0.8, 0.5) * 4,
             opacity: 0.7 + Math.random() * 0.3,
@@ -161,12 +162,14 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
     return () => cancelAnimationFrame(frameId);
   }, [animateBalls]);
 
-  // Per-ball deformation based on CURRENT screen position, fixed at 12 & 6 o'clock
+  // Per-ball deformation — loaded zone is at 6 o'clock (bottom), ~4 to 8.
+  // In SVG coords: sin(a) = +1 at 6 o'clock (bottom), 0 at 3/9, -1 at 12.
+  // sin(a) > 0.3 covers roughly 4 o'clock to 8 o'clock.
   const ballShapes = useMemo(() => {
     return ballPositions.map((b, i) => {
-      // sin(a): ±1 at top/bottom (12 & 6), 0 at sides (3 & 9)
-      const loadZone = Math.abs(Math.sin(b.a));
-      const inLoadZone = loadZone > 0.5 && loadForce > 0;
+      const bottomProximity = Math.sin(b.a); // +1 at bottom (6), -1 at top (12)
+      const loadZone = Math.max(0, bottomProximity); // 0..1, only bottom half
+      const inLoadZone = loadZone > 0.3 && loadForce > 0;
       const squish = loadZone * loadForce * 0.12;
       const rx = 4.2 + squish * 1.5;
       const ry = Math.max(1.5, 4.2 - squish * 3);
@@ -182,43 +185,38 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
 
       <div className="absolute inset-0 grid place-items-center">
         <svg viewBox="-10 -50 120 160" className="w-[min(70vh,70vw)] h-[min(70vh,70vw)] max-w-[640px] max-h-[640px]">
-          {/* Housing — bends under load with curved sides */}
+          {/* Housing — deflects slightly under reaction load from outer ring */}
           {showHousing && (() => {
-            const bow = deflectY * 2.5; // how much the sides bow outward
-            const sag = deflectY * 1.5; // how much the bottom sags down
-            // Outer housing path: top is flat, sides bow out, bottom sags
+            const sag = deflectY * 1.2; // bottom sags from reaction force
             const outerPath = `
               M -8,-8
               L 108,-8
-              C ${108 + bow * 0.3},${40 + sag * 0.3} ${108 + bow * 0.3},${60 + sag * 0.5} 108,${108 + sag}
-              Q 50,${108 + sag * 1.4} -8,${108 + sag}
-              C ${-8 - bow * 0.3},${60 + sag * 0.5} ${-8 - bow * 0.3},${40 + sag * 0.3} -8,-8
+              L 108,${108 + sag}
+              Q 50,${108 + sag * 1.3} -8,${108 + sag}
               Z
             `;
-            // Inner housing path
             const innerPath = `
               M -2,-2
               L 102,-2
-              C ${102 + bow * 0.2},${38 + sag * 0.2} ${102 + bow * 0.2},${62 + sag * 0.4} 102,${102 + sag * 0.8}
-              Q 50,${102 + sag * 1.2} -2,${102 + sag * 0.8}
-              C ${-2 - bow * 0.2},${62 + sag * 0.4} ${-2 - bow * 0.2},${38 + sag * 0.2} -2,-2
+              L 102,${102 + sag * 0.7}
+              Q 50,${102 + sag * 1.0} -2,${102 + sag * 0.7}
               Z
             `;
             return (
               <g>
                 <path d={outerPath} fill="#1e2a3a" stroke="#3a4f6a" strokeWidth="2" />
                 <path d={innerPath} fill="#162030" stroke="#2a3f5a" strokeWidth="1" />
-                {/* Mounting bolt holes — top stays fixed, bottom follows sag */}
+                {/* Mounting bolt holes — top fixed, bottom follows sag */}
                 <circle cx="6" cy="6" r="3" fill="#0e1620" stroke="#3a4f6a" strokeWidth="0.8" />
                 <circle cx="94" cy="6" r="3" fill="#0e1620" stroke="#3a4f6a" strokeWidth="0.8" />
-                <circle cx="6" cy={94 + sag * 0.9} r="3" fill="#0e1620" stroke="#3a4f6a" strokeWidth="0.8" />
-                <circle cx="94" cy={94 + sag * 0.9} r="3" fill="#0e1620" stroke="#3a4f6a" strokeWidth="0.8" />
+                <circle cx="6" cy={94 + sag * 0.8} r="3" fill="#0e1620" stroke="#3a4f6a" strokeWidth="0.8" />
+                <circle cx="94" cy={94 + sag * 0.8} r="3" fill="#0e1620" stroke="#3a4f6a" strokeWidth="0.8" />
               </g>
             );
           })()}
 
-          {/* Outer ring — ovalizes under radial load, shifts with housing */}
-          <g transform={showHousing ? `translate(0, ${deflectY * 0.8})` : undefined}>
+          {/* Outer ring — ovalizes slightly from bottom reaction force */}
+          <g>
             <ellipse cx="50" cy="50" rx={outerRx} ry={outerRy} fill={showHousing ? "#1a2840" : "none"} stroke="#5f7c9f" strokeWidth="4" />
             <ellipse cx="50" cy="50" rx={outerRx2} ry={outerRy2} fill={showHousing ? "#0f1825" : "none"} stroke="#9db6cb" strokeWidth="6" />
           </g>
@@ -313,13 +311,13 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
               ))}
               {/* Puddle below housing if heavily overfilled */}
               {greaseLevel > 1.0 && (
-                <ellipse cx="50" cy={116 + deflectY * 1.5} rx={8 + (greaseLevel - 1) * 20} ry={1.5 + (greaseLevel - 1) * 2} fill="#c4a832" opacity="0.5" />
+                <ellipse cx="50" cy={116} rx={8 + (greaseLevel - 1) * 20} ry={1.5 + (greaseLevel - 1) * 2} fill="#c4a832" opacity="0.5" />
               )}
             </g>
           )}
 
-          {/* Inner ring — shifts with deflection */}
-          <g transform={`translate(0, ${deflectY * 0.5})`}>
+          {/* Inner ring — attached to shaft, gets full deflection */}
+          <g transform={`translate(0, ${deflectY})`}>
             <g
               style={{
                 transformOrigin: "50px 50px",
@@ -335,26 +333,14 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
           {/* Center dot — follows inner ring */}
           <circle cx="50" cy={50 + deflectY} r="2" fill="#7fe3ff" />
 
-          {/* Force arrow — points at housing when visible, otherwise at bearing */}
+          {/* Force arrow — applied to inner ring via shaft (points down at center) */}
           {loadForce > 0 && (
             <g>
-              {showHousing ? (
-                <>
-                  <line x1="50" y1={-12} x2="50" y2={-12 - loadForce * 8} stroke="#ff4444" strokeWidth="2.5" />
-                  <polygon points={`46,-12 54,-12 50,-5`} fill="#ff4444" />
-                  <text x="56" y={-12 - loadForce * 4} fill="#ff6666" fontSize="4.5" fontWeight="bold" fontFamily="monospace">
-                    {loadForce.toFixed(1)} kN ↓
-                  </text>
-                </>
-              ) : (
-                <>
-                  <line x1="50" y1="-4" x2="50" y2={-4 - loadForce * 8} stroke="#ff4444" strokeWidth="2.5" />
-                  <polygon points={`46,-4 54,-4 50,4`} fill="#ff4444" />
-                  <text x="56" y={-4 - loadForce * 4} fill="#ff6666" fontSize="4.5" fontWeight="bold" fontFamily="monospace">
-                    {loadForce.toFixed(1)} kN ↓
-                  </text>
-                </>
-              )}
+              <line x1="50" y1={50 - 25} x2="50" y2={50 - 25 - loadForce * 8} stroke="#ff4444" strokeWidth="2.5" />
+              <polygon points={`46,${50 - 25} 54,${50 - 25} 50,${50 - 18}`} fill="#ff4444" />
+              <text x="56" y={50 - 25 - loadForce * 4} fill="#ff6666" fontSize="4.5" fontWeight="bold" fontFamily="monospace">
+                {loadForce.toFixed(1)} kN ↓
+              </text>
             </g>
           )}
         </svg>

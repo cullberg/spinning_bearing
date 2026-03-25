@@ -510,13 +510,13 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
   const spinDirection = direction === "cw" ? "normal" : "reverse";
   const maxDeflect = 3;
   const deflectY = Math.min(loadForce * 1.5, maxDeflect);
-  const ovalFactor = loadForce * 1.2;
+  const ovalFactor = loadForce * 0.8;
   const outerR = 47;
   const outerR2 = 41;
-  const outerRx = outerR + ovalFactor;
-  const outerRy = outerR - ovalFactor;
-  const outerRx2 = outerR2 + ovalFactor * 0.8;
-  const outerRy2 = outerR2 - ovalFactor * 0.8;
+  const outerRx = outerR + ovalFactor * 0.5;
+  const outerRy = outerR - ovalFactor * 0.5;
+  const outerRx2 = outerR2 + ovalFactor * 0.4;
+  const outerRy2 = outerR2 - ovalFactor * 0.4;
   const BALL_COUNT = 9;
   const BALL_ORBIT_R = 35;
   const cageAngleRef = useRef(0);
@@ -589,7 +589,7 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
         if (Math.random() < (greaseLevel - 0.8) * 0.3) {
           drops.push({
             x: 30 + Math.random() * 40,
-            y: 108 + deflectY * 1.5,
+            y: 108,
             vy: 2 + Math.random() * 3,
             size: 1 + Math.random() * 1.5 * Math.min(greaseLevel - 0.8, 0.5) * 4,
             opacity: 0.7 + Math.random() * 0.3
@@ -618,8 +618,9 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
   }, [animateBalls]);
   const ballShapes = useMemo(() => {
     return ballPositions.map((b, i) => {
-      const loadZone = Math.abs(Math.sin(b.a));
-      const inLoadZone = loadZone > 0.5 && loadForce > 0;
+      const bottomProximity = Math.sin(b.a);
+      const loadZone = Math.max(0, bottomProximity);
+      const inLoadZone = loadZone > 0.3 && loadForce > 0;
       const squish = loadZone * loadForce * 0.12;
       const rx = 4.2 + squish * 1.5;
       const ry = Math.max(1.5, 4.2 - squish * 3);
@@ -632,22 +633,19 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
       ` }),
     /* @__PURE__ */ jsx("div", { className: "absolute inset-0 grid place-items-center", children: /* @__PURE__ */ jsxs("svg", { viewBox: "-10 -50 120 160", className: "w-[min(70vh,70vw)] h-[min(70vh,70vw)] max-w-[640px] max-h-[640px]", children: [
       showHousing && (() => {
-        const bow = deflectY * 2.5;
-        const sag = deflectY * 1.5;
+        const sag = deflectY * 1.2;
         const outerPath = `
               M -8,-8
               L 108,-8
-              C ${108 + bow * 0.3},${40 + sag * 0.3} ${108 + bow * 0.3},${60 + sag * 0.5} 108,${108 + sag}
-              Q 50,${108 + sag * 1.4} -8,${108 + sag}
-              C ${-8 - bow * 0.3},${60 + sag * 0.5} ${-8 - bow * 0.3},${40 + sag * 0.3} -8,-8
+              L 108,${108 + sag}
+              Q 50,${108 + sag * 1.3} -8,${108 + sag}
               Z
             `;
         const innerPath = `
               M -2,-2
               L 102,-2
-              C ${102 + bow * 0.2},${38 + sag * 0.2} ${102 + bow * 0.2},${62 + sag * 0.4} 102,${102 + sag * 0.8}
-              Q 50,${102 + sag * 1.2} -2,${102 + sag * 0.8}
-              C ${-2 - bow * 0.2},${62 + sag * 0.4} ${-2 - bow * 0.2},${38 + sag * 0.2} -2,-2
+              L 102,${102 + sag * 0.7}
+              Q 50,${102 + sag * 1} -2,${102 + sag * 0.7}
               Z
             `;
         return /* @__PURE__ */ jsxs("g", { children: [
@@ -655,11 +653,11 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
           /* @__PURE__ */ jsx("path", { d: innerPath, fill: "#162030", stroke: "#2a3f5a", strokeWidth: "1" }),
           /* @__PURE__ */ jsx("circle", { cx: "6", cy: "6", r: "3", fill: "#0e1620", stroke: "#3a4f6a", strokeWidth: "0.8" }),
           /* @__PURE__ */ jsx("circle", { cx: "94", cy: "6", r: "3", fill: "#0e1620", stroke: "#3a4f6a", strokeWidth: "0.8" }),
-          /* @__PURE__ */ jsx("circle", { cx: "6", cy: 94 + sag * 0.9, r: "3", fill: "#0e1620", stroke: "#3a4f6a", strokeWidth: "0.8" }),
-          /* @__PURE__ */ jsx("circle", { cx: "94", cy: 94 + sag * 0.9, r: "3", fill: "#0e1620", stroke: "#3a4f6a", strokeWidth: "0.8" })
+          /* @__PURE__ */ jsx("circle", { cx: "6", cy: 94 + sag * 0.8, r: "3", fill: "#0e1620", stroke: "#3a4f6a", strokeWidth: "0.8" }),
+          /* @__PURE__ */ jsx("circle", { cx: "94", cy: 94 + sag * 0.8, r: "3", fill: "#0e1620", stroke: "#3a4f6a", strokeWidth: "0.8" })
         ] });
       })(),
-      /* @__PURE__ */ jsxs("g", { transform: showHousing ? `translate(0, ${deflectY * 0.8})` : void 0, children: [
+      /* @__PURE__ */ jsxs("g", { children: [
         /* @__PURE__ */ jsx("ellipse", { cx: "50", cy: "50", rx: outerRx, ry: outerRy, fill: showHousing ? "#1a2840" : "none", stroke: "#5f7c9f", strokeWidth: "4" }),
         /* @__PURE__ */ jsx("ellipse", { cx: "50", cy: "50", rx: outerRx2, ry: outerRy2, fill: showHousing ? "#0f1825" : "none", stroke: "#9db6cb", strokeWidth: "6" })
       ] }),
@@ -726,9 +724,9 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
           },
           i
         )),
-        greaseLevel > 1 && /* @__PURE__ */ jsx("ellipse", { cx: "50", cy: 116 + deflectY * 1.5, rx: 8 + (greaseLevel - 1) * 20, ry: 1.5 + (greaseLevel - 1) * 2, fill: "#c4a832", opacity: "0.5" })
+        greaseLevel > 1 && /* @__PURE__ */ jsx("ellipse", { cx: "50", cy: 116, rx: 8 + (greaseLevel - 1) * 20, ry: 1.5 + (greaseLevel - 1) * 2, fill: "#c4a832", opacity: "0.5" })
       ] }),
-      /* @__PURE__ */ jsx("g", { transform: `translate(0, ${deflectY * 0.5})`, children: /* @__PURE__ */ jsxs(
+      /* @__PURE__ */ jsx("g", { transform: `translate(0, ${deflectY})`, children: /* @__PURE__ */ jsxs(
         "g",
         {
           style: {
@@ -743,21 +741,14 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
         }
       ) }),
       /* @__PURE__ */ jsx("circle", { cx: "50", cy: 50 + deflectY, r: "2", fill: "#7fe3ff" }),
-      loadForce > 0 && /* @__PURE__ */ jsx("g", { children: showHousing ? /* @__PURE__ */ jsxs(Fragment, { children: [
-        /* @__PURE__ */ jsx("line", { x1: "50", y1: -12, x2: "50", y2: -12 - loadForce * 8, stroke: "#ff4444", strokeWidth: "2.5" }),
-        /* @__PURE__ */ jsx("polygon", { points: `46,-12 54,-12 50,-5`, fill: "#ff4444" }),
-        /* @__PURE__ */ jsxs("text", { x: "56", y: -12 - loadForce * 4, fill: "#ff6666", fontSize: "4.5", fontWeight: "bold", fontFamily: "monospace", children: [
+      loadForce > 0 && /* @__PURE__ */ jsxs("g", { children: [
+        /* @__PURE__ */ jsx("line", { x1: "50", y1: 50 - 25, x2: "50", y2: 50 - 25 - loadForce * 8, stroke: "#ff4444", strokeWidth: "2.5" }),
+        /* @__PURE__ */ jsx("polygon", { points: `46,${50 - 25} 54,${50 - 25} 50,${50 - 18}`, fill: "#ff4444" }),
+        /* @__PURE__ */ jsxs("text", { x: "56", y: 50 - 25 - loadForce * 4, fill: "#ff6666", fontSize: "4.5", fontWeight: "bold", fontFamily: "monospace", children: [
           loadForce.toFixed(1),
           " kN ↓"
         ] })
-      ] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
-        /* @__PURE__ */ jsx("line", { x1: "50", y1: "-4", x2: "50", y2: -4 - loadForce * 8, stroke: "#ff4444", strokeWidth: "2.5" }),
-        /* @__PURE__ */ jsx("polygon", { points: `46,-4 54,-4 50,4`, fill: "#ff4444" }),
-        /* @__PURE__ */ jsxs("text", { x: "56", y: -4 - loadForce * 4, fill: "#ff6666", fontSize: "4.5", fontWeight: "bold", fontFamily: "monospace", children: [
-          loadForce.toFixed(1),
-          " kN ↓"
-        ] })
-      ] }) })
+      ] })
     ] }) })
   ] });
 }
@@ -856,7 +847,7 @@ const route1 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProper
   default: home,
   meta
 }, Symbol.toStringTag, { value: "Module" }));
-const serverManifest = { "entry": { "module": "/spinning_bearing/assets/entry.client-CftM3kWu.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": true, "module": "/spinning_bearing/assets/root-C6DR0swQ.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": ["/spinning_bearing/assets/root-QoD2F3yw.css"], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/home": { "id": "routes/home", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": false, "module": "/spinning_bearing/assets/home-CX06NDGy.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 } }, "url": "/spinning_bearing/assets/manifest-f8f680d9.js", "version": "f8f680d9", "sri": void 0 };
+const serverManifest = { "entry": { "module": "/spinning_bearing/assets/entry.client-CftM3kWu.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": true, "module": "/spinning_bearing/assets/root-C6DR0swQ.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": ["/spinning_bearing/assets/root-QoD2F3yw.css"], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/home": { "id": "routes/home", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": false, "module": "/spinning_bearing/assets/home-y-NzGBNV.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 } }, "url": "/spinning_bearing/assets/manifest-2d713549.js", "version": "2d713549", "sri": void 0 };
 const assetsBuildDirectory = "build/client";
 const basename = "/spinning_bearing/";
 const future = { "v8_middleware": false, "unstable_optimizeDeps": true, "unstable_splitRouteModules": false, "unstable_subResourceIntegrity": false, "unstable_viteEnvironmentApi": false };
