@@ -3,3 +3,6 @@
 
 # React Router
 /.react-router/
+
+# Build output
+/build/

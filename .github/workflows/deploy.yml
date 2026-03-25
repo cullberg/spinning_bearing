@@ -23,6 +23,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        working-directory: services/react-web-app
+        run: bun install
+
+      - name: Build
+        working-directory: services/react-web-app
+        run: |
+          bun react-router build
+          cp build/client/spinning_bearing/index.html build/client/index.html
+          cp build/client/spinning_bearing/index.html build/client/404.html
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
