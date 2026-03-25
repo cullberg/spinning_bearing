@@ -587,7 +587,7 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
         setGreasePositions(positions);
       }
       const drops = leakDropsRef.current;
-      if (greaseLevel > 0.8 && showHousing) {
+      if (isPlaying && greaseLevel > 0.8 && showHousing) {
         if (Math.random() < (greaseLevel - 0.8) * 0.3) {
           drops.push({
             x: 30 + Math.random() * 40,
@@ -598,11 +598,13 @@ function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = 
           });
         }
       }
-      for (let i = drops.length - 1; i >= 0; i--) {
-        drops[i].y += drops[i].vy * delta * 20;
-        drops[i].opacity -= delta * 0.3;
-        if (drops[i].opacity <= 0 || drops[i].y > 160) {
-          drops.splice(i, 1);
+      if (isPlaying) {
+        for (let i = drops.length - 1; i >= 0; i--) {
+          drops[i].y += drops[i].vy * delta * 20;
+          drops[i].opacity -= delta * 0.3;
+          if (drops[i].opacity <= 0 || drops[i].y > 160) {
+            drops.splice(i, 1);
+          }
         }
       }
       setLeakDrops(drops.map((d) => ({ x: d.x, y: d.y, size: d.size, opacity: d.opacity })));
@@ -849,7 +851,7 @@ const route1 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProper
   default: home,
   meta
 }, Symbol.toStringTag, { value: "Module" }));
-const serverManifest = { "entry": { "module": "/spinning_bearing/assets/entry.client-CftM3kWu.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": true, "module": "/spinning_bearing/assets/root-C6DR0swQ.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": ["/spinning_bearing/assets/root-QoD2F3yw.css"], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/home": { "id": "routes/home", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": false, "module": "/spinning_bearing/assets/home-DT_Dbfzx.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 } }, "url": "/spinning_bearing/assets/manifest-6ef01cef.js", "version": "6ef01cef", "sri": void 0 };
+const serverManifest = { "entry": { "module": "/spinning_bearing/assets/entry.client-CftM3kWu.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": true, "module": "/spinning_bearing/assets/root-C6DR0swQ.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": ["/spinning_bearing/assets/root-QoD2F3yw.css"], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/home": { "id": "routes/home", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasErrorBoundary": false, "module": "/spinning_bearing/assets/home-CAs_BxPs.js", "imports": ["/spinning_bearing/assets/chunk-B7RQU5TL-WGoqqZ8d.js", "/spinning_bearing/assets/index-ANSrf5OS.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 } }, "url": "/spinning_bearing/assets/manifest-6556283c.js", "version": "6556283c", "sri": void 0 };
 const assetsBuildDirectory = "build/client";
 const basename = "/spinning_bearing/";
 const future = { "v8_middleware": false, "unstable_optimizeDeps": true, "unstable_splitRouteModules": false, "unstable_subResourceIntegrity": false, "unstable_viteEnvironmentApi": false };

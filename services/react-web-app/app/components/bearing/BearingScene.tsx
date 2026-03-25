@@ -129,7 +129,7 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
 
       // Leak drips — when overfilled, grease drops fall below housing
       const drops = leakDropsRef.current;
-      if (greaseLevel > 0.8 && showHousing) {
+      if (isPlaying && greaseLevel > 0.8 && showHousing) {
         // Spawn new drips occasionally
         if (Math.random() < (greaseLevel - 0.8) * 0.3) {
           drops.push({
@@ -141,12 +141,14 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
           });
         }
       }
-      // Animate existing drips
-      for (let i = drops.length - 1; i >= 0; i--) {
-        drops[i].y += drops[i].vy * delta * 20;
-        drops[i].opacity -= delta * 0.3;
-        if (drops[i].opacity <= 0 || drops[i].y > 160) {
-          drops.splice(i, 1);
+      // Animate existing drips (only when playing)
+      if (isPlaying) {
+        for (let i = drops.length - 1; i >= 0; i--) {
+          drops[i].y += drops[i].vy * delta * 20;
+          drops[i].opacity -= delta * 0.3;
+          if (drops[i].opacity <= 0 || drops[i].y > 160) {
+            drops.splice(i, 1);
+          }
         }
       }
       setLeakDrops(drops.map(d => ({ x: d.x, y: d.y, size: d.size, opacity: d.opacity })));
