@@ -8,11 +8,13 @@ interface BearingSceneProps {
   loadForce?: number;
   /** Show bearing housing around outer ring */
   showHousing?: boolean;
-  /** Apply grease via nipple (requires housing) */
-  greaseActive?: boolean;
+  /** Grease fill level 0-1+ (>0.8 starts leaking, >1 overflows) */
+  greaseLevel?: number;
+  /** Pump handle position 0-1 (animated externally) */
+  pumpStroke?: number;
 }
 
-export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = false, greaseActive = false }: BearingSceneProps) {
+export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0, showHousing = false, greaseLevel = 0, pumpStroke = 0 }: BearingSceneProps) {
   const ringDuration = useMemo(() => {
     if (!isPlaying || rpm <= 0) return "0s";
     const r = Math.max(0.1, rpm);
@@ -70,7 +72,9 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
     })),
   );
   const [greasePositions, setGreasePositions] = useState<{ x: number; y: number; size: number; opacity: number }[]>([]);
-  const greaseAmountRef = useRef(0);
+  // Leak drips state: drops that have overflowed and fall below housing
+  const leakDropsRef = useRef<{ x: number; y: number; vy: number; size: number; opacity: number }[]>([]);
+  const [leakDrops, setLeakDrops] = useState<{ x: number; y: number; size: number; opacity: number }[]>([]);
 
   const animateBalls = useCallback(
     (time: number) => {
@@ -96,15 +100,8 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
         );
       }
 
-      // Grease amount ramp
-      if (greaseActive && showHousing) {
-        greaseAmountRef.current = Math.min(greaseAmountRef.current + 0.02, 1);
-      } else {
-        greaseAmountRef.current = Math.max(greaseAmountRef.current - 0.01, 0);
-      }
-
-      // Grease particle positions
-      const amount = greaseAmountRef.current;
+      // Grease particles based on fill level
+      const amount = Math.min(greaseLevel, 1);
       if (amount <= 0) {
         setGreasePositions([]);
       } else {
@@ -120,14 +117,38 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
           positions.push({
             x: 50 + Math.cos(p.angle) * r,
             y: 50 + Math.sin(p.angle) * r,
-            size: p.size,
-            opacity: p.opacity * amount,
+            size: p.size * (0.8 + amount * 0.4),
+            opacity: p.opacity * Math.min(amount * 1.5, 1),
           });
         }
         setGreasePositions(positions);
       }
+
+      // Leak drips — when overfilled, grease drops fall below housing
+      const drops = leakDropsRef.current;
+      if (greaseLevel > 0.8 && showHousing) {
+        // Spawn new drips occasionally
+        if (Math.random() < (greaseLevel - 0.8) * 0.3) {
+          drops.push({
+            x: 30 + Math.random() * 40,
+            y: 108 + deflectY * 1.5,
+            vy: 2 + Math.random() * 3,
+            size: 1.0 + Math.random() * 1.5 * Math.min(greaseLevel - 0.8, 0.5) * 4,
+            opacity: 0.7 + Math.random() * 0.3,
+          });
+        }
+      }
+      // Animate existing drips
+      for (let i = drops.length - 1; i >= 0; i--) {
+        drops[i].y += drops[i].vy * delta * 20;
+        drops[i].opacity -= delta * 0.3;
+        if (drops[i].opacity <= 0 || drops[i].y > 160) {
+          drops.splice(i, 1);
+        }
+      }
+      setLeakDrops(drops.map(d => ({ x: d.x, y: d.y, size: d.size, opacity: d.opacity })));
     },
-    [isPlaying, rpm, direction, greaseActive, showHousing],
+    [isPlaying, rpm, direction, greaseLevel, showHousing, deflectY],
   );
 
   useEffect(() => {
@@ -247,20 +268,52 @@ export default function BearingScene({ rpm, direction, isPlaying, loadForce = 0,
             </g>
           )}
 
-          {/* Grease nipple — on top of housing */}
+          {/* Grease nipple + hand pump — on housing */}
           {showHousing && (
             <g>
-              {/* Nipple body */}
-              <rect x="93" y="-4" width="8" height="12" rx="2" fill={greaseActive ? "#8b7a2a" : "#4a4a5a"} stroke="#6a6a7a" strokeWidth="0.8" />
-              {/* Nipple tip */}
-              <circle cx="97" cy="-4" r="2.5" fill={greaseActive ? "#c4a832" : "#5a5a6a"} stroke="#7a7a8a" strokeWidth="0.6" />
-              {/* Grease flow indicator */}
-              {greaseActive && (
+              {/* Nipple fitting on housing */}
+              <rect x="95" y="-2" width="5" height="8" rx="1.5" fill="#5a5a6a" stroke="#7a7a8a" strokeWidth="0.6" />
+              <circle cx="97.5" cy="-2" r="2" fill="#6a6a7a" stroke="#8a8a9a" strokeWidth="0.5" />
+              {/* Hose from nipple to pump */}
+              <path d="M 100,2 Q 112,2 114,10 Q 116,18 114,22" fill="none" stroke="#444" strokeWidth="1.8" strokeLinecap="round" />
+              {/* Pump body (cylinder) */}
+              <rect x="108" y="22" width="12" height="30" rx="2" fill="#3a3a4a" stroke="#5a5a6a" strokeWidth="0.8" />
+              {/* Grease level inside pump — decreases as you pump */}
+              <rect x="109.5" y={23 + (1 - Math.max(0, 1 - greaseLevel)) * 28} width="9" height={Math.max(0, 1 - greaseLevel) * 28} rx="1" fill="#c4a832" opacity="0.6" />
+              {/* Pump handle bar */}
+              <rect x="106" y={22 - 12 + pumpStroke * 12} width="16" height="3" rx="1" fill="#6a6a7a" stroke="#8a8a9a" strokeWidth="0.5" />
+              {/* Handle grip */}
+              <rect x="110" y={22 - 16 + pumpStroke * 12} width="8" height="5" rx="1.5" fill="#888" stroke="#aaa" strokeWidth="0.4" />
+              {/* Pump rod */}
+              <rect x="113" y={22 - 12 + pumpStroke * 12} width="2" height={12 - pumpStroke * 10} fill="#777" />
+              {/* Grease flow from nipple when recently pumped */}
+              {greaseLevel > 0 && pumpStroke > 0.3 && (
                 <>
-                  <circle cx="97" cy="2" r="1.2" fill="#c4a832" opacity="0.8" />
-                  <circle cx="95" cy="5" r="0.8" fill="#c4a832" opacity="0.6" />
-                  <circle cx="99" cy="5" r="0.8" fill="#c4a832" opacity="0.6" />
+                  <circle cx="97.5" cy="3" r="1.2" fill="#c4a832" opacity="0.8" />
+                  <circle cx="96" cy="6" r="0.9" fill="#c4a832" opacity="0.6" />
+                  <circle cx="99" cy="6" r="0.9" fill="#c4a832" opacity="0.6" />
                 </>
+              )}
+            </g>
+          )}
+
+          {/* Leak drips — grease overflow falling below housing */}
+          {leakDrops.length > 0 && (
+            <g>
+              {leakDrops.map((d, i) => (
+                <ellipse
+                  key={i}
+                  cx={d.x}
+                  cy={d.y}
+                  rx={d.size * 0.8}
+                  ry={d.size * 1.3}
+                  fill="#c4a832"
+                  opacity={d.opacity}
+                />
+              ))}
+              {/* Puddle below housing if heavily overfilled */}
+              {greaseLevel > 1.0 && (
+                <ellipse cx="50" cy={116 + deflectY * 1.5} rx={8 + (greaseLevel - 1) * 20} ry={1.5 + (greaseLevel - 1) * 2} fill="#c4a832" opacity="0.5" />
               )}
             </g>
           )}

@@ -17,7 +17,8 @@ export default function Home() {
   const [isPlaying, setIsPlaying] = useState(true);
   const [loadForce, setLoadForce] = useState(1.0);
   const [showHousing, setShowHousing] = useState(false);
-  const [greaseActive, setGreaseActive] = useState(false);
+  const [greaseLevel, setGreaseLevel] = useState(0);
+  const [pumpStroke, setPumpStroke] = useState(0);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -30,7 +31,16 @@ export default function Home() {
     setDirection("cw");
     setLoadForce(0);
     setShowHousing(false);
-    setGreaseActive(false);
+    setGreaseLevel(0);
+    setPumpStroke(0);
+  };
+
+  const handlePump = () => {
+    setGreaseLevel((prev) => prev + 0.15);
+    // Animate pump stroke: push down then spring back
+    setPumpStroke(1);
+    setTimeout(() => setPumpStroke(0.5), 100);
+    setTimeout(() => setPumpStroke(0), 250);
   };
 
   return (
@@ -49,7 +59,7 @@ export default function Home() {
         {/* 3D viewport */}
         <div className="flex-1 bg-[#12121f]">
           {isClient ? (
-            <BearingScene rpm={rpm} direction={direction} isPlaying={isPlaying} loadForce={loadForce} showHousing={showHousing} greaseActive={greaseActive} />
+            <BearingScene rpm={rpm} direction={direction} isPlaying={isPlaying} loadForce={loadForce} showHousing={showHousing} greaseLevel={greaseLevel} pumpStroke={pumpStroke} />
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground">
               Loading 3D scene…
@@ -71,8 +81,8 @@ export default function Home() {
             setLoadForce={setLoadForce}
             showHousing={showHousing}
             setShowHousing={setShowHousing}
-            greaseActive={greaseActive}
-            setGreaseActive={setGreaseActive}
+            greaseLevel={greaseLevel}
+            onPump={handlePump}
           />
         </div>
       </div>

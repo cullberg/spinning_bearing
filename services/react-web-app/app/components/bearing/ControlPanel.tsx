@@ -18,9 +18,10 @@ interface ControlPanelProps {
   /** Show bearing housing */
   showHousing: boolean;
   setShowHousing: (show: boolean) => void;
-  /** Apply grease via nipple */
-  greaseActive: boolean;
-  setGreaseActive: (active: boolean) => void;
+  /** Grease fill level 0-1+ */
+  greaseLevel: number;
+  /** Pump one stroke of grease */
+  onPump: () => void;
 }
 
 export default function ControlPanel({
@@ -35,8 +36,8 @@ export default function ControlPanel({
   setLoadForce,
   showHousing,
   setShowHousing,
-  greaseActive,
-  setGreaseActive,
+  greaseLevel,
+  onPump,
 }: ControlPanelProps) {
   return (
     <Card className="w-72">
@@ -154,18 +155,41 @@ export default function ControlPanel({
           </Button>
         </div>
 
-        {/* Grease — only available with housing */}
+        {/* Grease — hand pump, only with housing */}
         {showHousing && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Grease</span>
-            <Button
-              variant={greaseActive ? "default" : "outline"}
-              size="sm"
-              onClick={() => setGreaseActive(!greaseActive)}
-              className={greaseActive ? "bg-yellow-700 hover:bg-yellow-800" : ""}
-            >
-              {greaseActive ? "🟡 Pumping" : "Apply"}
-            </Button>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Grease Pump</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onPump}
+                className="active:scale-95 transition-transform"
+              >
+                🛢️ Pump
+              </Button>
+            </div>
+            {/* Fill level bar */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Fill level</span>
+                <span className="font-mono">{Math.round(greaseLevel * 100)}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    greaseLevel > 1 ? "bg-red-500" : greaseLevel > 0.8 ? "bg-yellow-500" : "bg-emerald-500"
+                  }`}
+                  style={{ width: `${Math.min(greaseLevel * 100, 100)}%` }}
+                />
+              </div>
+              {greaseLevel > 0.8 && greaseLevel <= 1 && (
+                <p className="text-xs text-yellow-500">⚠ Near capacity</p>
+              )}
+              {greaseLevel > 1 && (
+                <p className="text-xs text-red-500">💧 Overfilled — grease leaking!</p>
+              )}
+            </div>
           </div>
         )}
 
